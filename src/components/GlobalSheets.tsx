@@ -10,7 +10,7 @@ export function GlobalSheets() {
   if (!req) return null;
   switch (req.type) {
     case 'quick':
-      return <QuickAddSheet date={req.date} areaId={req.areaId} kind={req.kind} text={req.text} onClose={closeSheet} />;
+      return <QuickAddSheet date={req.date} time={req.time} areaId={req.areaId} kind={req.kind} text={req.text} onClose={closeSheet} />;
     case 'entry':
       return <EntrySheet key={`${req.id}:${req.date ?? ''}`} id={req.id} date={req.date} onClose={closeSheet} />;
     case 'birthday':

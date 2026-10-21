@@ -2,10 +2,13 @@ import { ArrowDown, ArrowUp, ChevronLeft, Settings2, Trash2 } from 'lucide-react
 import { useState } from 'react';
 import { confirmDialog, Empty, Sheet, Switch, toast } from '../components/ui';
 import { navigate, useRoute } from '../lib/router';
+import { DiaryModule } from '../modules/DiaryModule';
 import { DocsModule } from '../modules/DocsModule';
 import { GoalsModule } from '../modules/GoalsModule';
 import { LiftsModule } from '../modules/LiftsModule';
+import { ListModule } from '../modules/ListModule';
 import { MenuModule } from '../modules/MenuModule';
+import { MetricsModule } from '../modules/MetricsModule';
 import { NotesModule } from '../modules/NotesModule';
 import { PlanModule } from '../modules/PlanModule';
 import { TasksModule } from '../modules/TasksModule';
@@ -83,6 +86,10 @@ export function AreaDetail({ id }: { id: string }) {
       {current === 'menu' && <MenuModule area={area} />}
       {current === 'lifts' && <LiftsModule area={area} />}
       {current === 'notes' && <NotesModule area={area} />}
+      {current === 'shopping' && <ListModule area={area} list="compra" />}
+      {current === 'chores' && <ListModule area={area} list="casa" />}
+      {current === 'diary' && <DiaryModule area={area} />}
+      {current === 'metrics' && <MetricsModule area={area} />}
 
       {settings && <AreaSettingsSheet area={area} onClose={() => setSettings(false)} />}
     </div>

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { formatRelative, todayISO } from '../lib/dates';
 import { parseQuick } from '../lib/quickParse';
 import { addBirthday, addEntry, deleteBirthday, deleteEntry, useApp } from '../store/store';
-import type { EntryKind, ID, ISODate } from '../store/types';
+import type { EntryKind, HHMM, ID, ISODate } from '../store/types';
 import { Sheet, toast } from '../components/ui';
 import { BirthdayFields, validBirthday, type BirthdayDraft } from './BirthdayFields';
 import { EntryFields, KIND_OPTIONS, type EntryDraft } from './EntryForm';
@@ -18,31 +18,37 @@ const EXAMPLES = [
 
 type Kind = EntryKind | 'birthday';
 
-export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; areaId?: ID; kind?: Kind; text?: string }) {
+export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time?: HHMM; areaId?: ID; kind?: Kind; text?: string }) {
   const state = useApp();
   const [text, setText] = useState(props.text ?? '');
-  const [manual, setManual] = useState<Partial<EntryDraft>>(() => ({
-    ...(props.date ? { date: props.date } : {}),
-    ...(props.areaId ? { areaId: props.areaId } : {}),
-  }));
+  // Lo que se toca a mano manda; la fecha/hora con la que se abrió es solo el valor por defecto.
+  const [manual, setManual] = useState<Partial<EntryDraft>>(() => (props.areaId ? { areaId: props.areaId } : {}));
   const [kindOverride, setKindOverride] = useState<Kind | undefined>(props.kind);
   const [bManual, setBManual] = useState<Partial<BirthdayDraft>>({});
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
 
   const parsed = useMemo(() => parseQuick(text), [text]);
-  const kind: Kind = kindOverride ?? (props.areaId && parsed.kind !== 'birthday' && !parsed.date ? 'task' : parsed.kind);
+  const kind: Kind =
+    kindOverride ??
+    (props.areaId && parsed.kind !== 'birthday' && !parsed.date
+      ? 'task'
+      : parsed.kind === 'task' && (props.date || props.time)
+        ? 'reminder'
+        : parsed.kind);
   const defaultAlert = state.settings.defaultAlert;
 
+  const presetTime = parsed.date ? undefined : props.time;
+  const time = parsed.time ?? presetTime;
   const draft: EntryDraft = {
     kind: kind === 'birthday' ? 'reminder' : kind,
     title: parsed.title,
-    date: parsed.date,
-    time: parsed.time,
+    date: parsed.date ?? props.date,
+    time,
     endTime: parsed.endTime,
     repeat: parsed.repeat,
     category: parsed.category,
-    alert: parsed.time ? (parsed.alert ?? (kind === 'task' ? null : defaultAlert)) : null,
+    alert: time ? (parsed.alert ?? (kind === 'task' ? null : defaultAlert)) : null,
     ...manual,
   };
   if (draft.kind !== 'task' && !draft.date) draft.date = props.date ?? todayISO();

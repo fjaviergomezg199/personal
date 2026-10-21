@@ -9,6 +9,7 @@ import { hasValidToken } from './lib/google';
 import { dueAlerts, showSystemNotification } from './lib/notify';
 import { nextOccurrence } from './lib/recurrence';
 import { navigate, useRoute } from './lib/router';
+import { syncShare } from './lib/shareSync';
 import { maybeAutoReconnect, runSync } from './lib/syncRunner';
 import { Agenda } from './screens/Agenda';
 import { AreaDetail } from './screens/AreaDetail';
@@ -16,7 +17,7 @@ import { Areas } from './screens/Areas';
 import { Onboarding } from './screens/Onboarding';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
-import { getState, markNotified, onDataChange, useApp } from './store/store';
+import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
 
 export function App() {
   const state = useApp();
@@ -24,6 +25,7 @@ export function App() {
   useTheme(state.settings.theme);
   useAlerts();
   useGoogleSync();
+  useHomeShare();
   useServiceWorker();
   const shared = useSharedText();
 
@@ -170,6 +172,32 @@ function useGoogleSync() {
     }, 2500);
     return () => clearTimeout(t);
   }, [current]);
+}
+
+/** Hogar compartido: envía los cambios de las listas y recoge los de la otra persona. */
+function useHomeShare() {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const kick = (delay: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (getState().share) void syncShare();
+      }, delay);
+    };
+    const off = onListChange(() => kick(700));
+    kick(400);
+    const poll = setInterval(() => document.visibilityState === 'visible' && kick(0), 30000);
+    const onVisible = () => document.visibilityState === 'visible' && kick(0);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onVisible);
+    return () => {
+      off();
+      clearTimeout(timer);
+      clearInterval(poll);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onVisible);
+    };
+  }, []);
 }
 
 function useServiceWorker() {

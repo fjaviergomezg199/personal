@@ -1,4 +1,4 @@
-import { Bell, CalendarCheck, Copy, Download, RefreshCw, Smartphone, Upload } from 'lucide-react';
+import { Bell, CalendarCheck, Copy, Download, RefreshCw, Smartphone, Upload, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { confirmDialog, Segmented, SectionHead, Switch, toast } from '../components/ui';
 import { exportBackup, importBackup } from '../lib/backup';
@@ -11,6 +11,7 @@ import { connectGoogle, runSync, useSyncStatus } from '../lib/syncRunner';
 import { kv, requestPersistence } from '../store/db';
 import { createInitialState, replaceState, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
 import type { Settings as SettingsT } from '../store/types';
+import { HomeShareSheet } from '../sheets/HomeShareSheet';
 import { InstallCard } from './Install';
 
 
@@ -44,6 +45,11 @@ export function Settings() {
       <div className="section">
         <SectionHead title={<><CalendarCheck size={18} /> Google Calendar</>} />
         <GoogleCard />
+      </div>
+
+      <div className="section">
+        <SectionHead title={<><Users size={18} /> Hogar compartido</>} />
+        <HomeShareCard />
       </div>
 
       <div className="section">
@@ -446,6 +452,25 @@ function AboutCard() {
       >
         Borrar todos los datos
       </button>
+    </div>
+  );
+}
+
+function HomeShareCard() {
+  const state = useApp();
+  const [open, setOpen] = useState(false);
+  const share = state.share;
+  return (
+    <div className="card">
+      <p className="small muted" style={{ marginTop: 0 }}>
+        {share
+          ? share.error ?? `Lista de la compra y tareas de casa compartidas.${share.lastSync ? ` Última sincronización: ${new Date(share.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.` : ''}`
+          : 'Comparte la lista de la compra y las tareas de casa con tu pareja: lo que uno apunta, el otro lo ve.'}
+      </p>
+      <button className="btn secondary small" onClick={() => setOpen(true)}>
+        <Users size={16} /> {share ? 'Código para tu pareja y opciones' : 'Configurar hogar compartido'}
+      </button>
+      {open && <HomeShareSheet onClose={() => setOpen(false)} />}
     </div>
   );
 }

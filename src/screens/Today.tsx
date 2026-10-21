@@ -1,11 +1,14 @@
 import { Plus, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AgendaRow, EntryRow } from '../components/AgendaRow';
+import { DayView } from '../components/DayView';
+import { MacroSummary } from '../components/MacroSummary';
 import { GoalRow } from '../components/GoalRow';
 import { openSheet } from '../components/sheets';
 import { Empty, SectionHead } from '../components/ui';
-import { addDays, capitalize, formatLong, formatRelative, greeting, toISODate } from '../lib/dates';
+import { addDays, capitalize, formatLong, formatRelative, formatShort, greeting, toISODate } from '../lib/dates';
 import { clearQuery, navigate, useRoute } from '../lib/router';
+import { sumMacros } from '../lib/foods';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
 import { useApp } from '../store/store';
@@ -17,6 +20,9 @@ export function Today() {
   const route = useRoute();
   const [showAllOverdue, setShowAllOverdue] = useState(false);
   const [showAllInbox, setShowAllInbox] = useState(false);
+  const [dayState, setDay] = useState<{ base: string; date: string } | null>(null);
+  // El día elegido vuelve a «hoy» cuando cambia la fecha (medianoche).
+  const day = dayState && dayState.base === today ? dayState.date : today;
 
   // Enlaces directos: #/hoy?nuevo=1, #/hoy?ver=<id> (desde un aviso)
   const ver = route.query.get('ver');
@@ -35,11 +41,12 @@ export function Today() {
   const items = useMemo(() => agendaForDate(state, today, areas), [state, today, areas]);
   const birthdays = items.filter((i) => i.kind === 'birthday');
   const agenda = items.filter((i) => i.kind !== 'birthday');
+
   const overdue = useMemo(() => overdueEntries(state, today), [state, today]);
   const inbox = useMemo(() => inboxTasks(state), [state]);
   const menus = sortedAreas(state)
     .filter((a) => a.showOnToday && a.modules.includes('menu'))
-    .map((a) => ({ area: a, meals: todaysMenu(a, today) }))
+    .map((a) => ({ area: a, meals: todaysMenu(a, day) }))
     .filter((m) => m.meals.length);
   const goals = state.goals.filter((g) => !g.archived && g.period !== 'once' && (!g.areaId || areas.get(g.areaId)?.showOnToday !== false));
   const upcoming = useMemo(
@@ -91,35 +98,18 @@ export function Today() {
 
       <div className="section">
         <SectionHead
-          title="Agenda de hoy"
-          count={pendingCount}
+          title="Día a vista"
+          count={day === today ? pendingCount : undefined}
           action={
             <button className="link-btn" onClick={() => navigate('/agenda')}>
               Semana
             </button>
           }
         />
-        {agenda.length ? (
-          <div className="list">
-            {agenda.map((i) => (
-              <AgendaRow key={i.key} item={i} />
-            ))}
-          </div>
-        ) : (
-          <div className="card">
-            <Empty
-              emoji="🌤️"
-              title="Nada apuntado para hoy"
-              text="Añade un recordatorio o un plan, o crea tus áreas para ver aquí lo que toca cada día."
-              action={
-                <button className="btn small" onClick={() => openSheet({ type: 'quick', date: today })}>
-                  <Plus size={16} /> Añadir
-                </button>
-              }
-            />
-          </div>
-        )}
+        <DayView date={day} today={today} onDateChange={(d) => setDay({ base: today, date: d })} />
       </div>
+
+      <ShoppingPeek />
 
       {overdue.length > 0 && (
         <div className="section">
@@ -140,7 +130,7 @@ export function Today() {
       {menus.map(({ area, meals }) => (
         <div className="section" key={area.id}>
           <SectionHead
-            title={`${area.emoji} Menú de hoy`}
+            title={`${area.emoji} Menú de ${day === today ? 'hoy' : day === addDays(today, 1) ? 'mañana' : formatShort(day)}`}
             action={
               <button className="link-btn" onClick={() => navigate(`/areas/${area.id}?bloque=menu`)}>
                 Semana
@@ -157,6 +147,8 @@ export function Today() {
           </div>
         </div>
       ))}
+
+      <MacrosPeek today={today} />
 
       {goals.length > 0 && (
         <div className="section">
@@ -244,5 +236,54 @@ function RefreshHint() {
       <RefreshCw size={12} style={{ verticalAlign: -1 }} /> Google Calendar actualizado {formatRelative(toISODate(new Date(state.settings.google.lastSync))).toLowerCase()} a las{' '}
       {new Date(state.settings.google.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
     </p>
+  );
+}
+
+/** La lista de la compra, a mano desde Hoy. */
+function ShoppingPeek() {
+  const state = useApp();
+  const items = state.listItems.filter((i) => i.list === 'compra' && !i.done && !i.deleted);
+  const area = sortedAreas(state).find((a) => a.modules.includes('shopping'));
+  if (!items.length || !area) return null;
+  const names = items.slice(0, 4).map((i) => i.text).join(', ');
+  return (
+    <button className="card hstack mt12" style={{ width: '100%', textAlign: 'left', border: 0 }} onClick={() => navigate(`/areas/${area.id}?bloque=shopping`)}>
+      <span style={{ fontSize: 22 }}>🛒</span>
+      <div className="grow">
+        <div style={{ fontWeight: 700 }}>
+          Lista de la compra · {items.length}
+          {state.share ? ' · compartida' : ''}
+        </div>
+        <div className="small muted ellipsis">
+          {names}
+          {items.length > 4 ? '…' : ''}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** Calorías y macros de hoy (si se usa el diario de comidas). */
+function MacrosPeek({ today }: { today: string }) {
+  const state = useApp();
+  const area = sortedAreas(state).find((a) => a.showOnToday && a.modules.includes('diary'));
+  const logs = state.foodLog.filter((l) => l.date === today);
+  const targets = state.nutritionTargets;
+  if (!area || (!logs.length && !targets.kcal)) return null;
+  const open = () => navigate(`/areas/${area.id}?bloque=diary`);
+  return (
+    <div className="section">
+      <SectionHead
+        title={`${area.emoji} Calorías de hoy`}
+        action={
+          <button className="link-btn" onClick={open}>
+            Apuntar
+          </button>
+        }
+      />
+      <div className={`card tone-${area.color}`} role="button" tabIndex={0} onClick={open} style={{ cursor: 'pointer' }}>
+        <MacroSummary total={sumMacros(logs)} targets={targets} compact />
+      </div>
+    </div>
   );
 }

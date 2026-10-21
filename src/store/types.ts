@@ -59,7 +59,18 @@ export interface Birthday {
   updatedAt: string;
 }
 
-export type ModuleKey = 'plan' | 'tasks' | 'goals' | 'docs' | 'menu' | 'lifts' | 'notes';
+export type ModuleKey =
+  | 'plan'
+  | 'tasks'
+  | 'goals'
+  | 'docs'
+  | 'menu'
+  | 'lifts'
+  | 'notes'
+  | 'shopping'
+  | 'chores'
+  | 'diary'
+  | 'metrics';
 export type TemplateKey = 'studies' | 'running' | 'gym' | 'nutrition' | 'work' | 'home' | 'custom';
 export type AreaColor = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
 
@@ -148,6 +159,89 @@ export interface DocMeta {
   createdAt: string;
 }
 
+/* ---------- Listas del hogar (se pueden compartir) ---------- */
+
+export type ListKey = 'compra' | 'casa';
+
+export interface ListItem {
+  id: ID;
+  list: ListKey;
+  text: string;
+  qty?: string;
+  done: boolean;
+  /** Milisegundos: al fusionar cambios de los dos móviles gana el último. */
+  updatedAt: number;
+  /** Quién lo añadió o cambió por última vez. */
+  by?: string;
+  /** Borrado (se conserva un tiempo para que el otro móvil se entere). */
+  deleted?: boolean;
+}
+
+/** Hogar compartido: una hoja de cálculo de Google con un Apps Script. */
+export interface ShareConfig {
+  url: string;
+  key: string;
+  name: string;
+  lastSync?: number;
+  error?: string;
+}
+
+/* ---------- Nutrición ---------- */
+
+export interface Macros {
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+/** Alimento propio (valores por 100 g). */
+export interface CustomFood extends Macros {
+  id: ID;
+  name: string;
+  brand?: string;
+  unitName?: string;
+  unitGrams?: number;
+  barcode?: string;
+}
+
+/** Lo que se ha comido (valores ya calculados para la cantidad). */
+export interface FoodLogItem extends Macros {
+  id: ID;
+  date: ISODate;
+  meal: string;
+  name: string;
+  grams: number;
+  /** Clave del alimento (base de datos o propio). */
+  foodId?: string;
+  createdAt: string;
+}
+
+export interface NutritionTargets {
+  kcal?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
+/* ---------- Peso y medidas ---------- */
+
+export interface MetricType {
+  id: ID;
+  name: string;
+  unit: string;
+  goal?: number;
+  decimals: number;
+}
+
+export interface MetricEntry {
+  id: ID;
+  metricId: ID;
+  date: ISODate;
+  value: number;
+  note?: string;
+}
+
 export interface GoogleEvent {
   id: string;
   calendarId: string;
@@ -196,7 +290,7 @@ export interface Settings {
 }
 
 export interface AppState {
-  version: 1;
+  version: 2;
   settings: Settings;
   entries: Entry[];
   birthdays: Birthday[];
@@ -210,4 +304,13 @@ export interface AppState {
   googleDeletes: GoogleLink[];
   /** Avisos ya mostrados: clave → timestamp. */
   notified: Record<string, number>;
+  listItems: ListItem[];
+  /** Ids de elementos de las listas cambiados aquí y aún no enviados. */
+  listPending: ID[];
+  share?: ShareConfig;
+  foodLog: FoodLogItem[];
+  customFoods: CustomFood[];
+  nutritionTargets: NutritionTargets;
+  metricTypes: MetricType[];
+  metrics: MetricEntry[];
 }

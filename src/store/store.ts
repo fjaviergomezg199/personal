@@ -6,9 +6,9 @@ import { DEFAULT_MEALS } from '../lib/importers';
 import { files, kv } from './db';
 import { templateInfo } from './templates';
 import type {
-  AppState, Area, Birthday, CustomFood, DocMeta, Entry, FoodLogItem, Goal, GoogleCalendarInfo, GoogleEvent, GoogleSettings, ID,
-  ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, NutritionTargets, PlanItem, Settings, ShareConfig,
-  TemplateKey,
+  AppState, Area, Birthday, CustomFood, DocMeta, Entry, FinAccount, FinanceState, FinScope, FoodLogItem, Goal, GoogleCalendarInfo,
+  GoogleEvent, GoogleSettings, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
+  NutritionTargets, PlanItem, Recurring, Settings, ShareConfig, TemplateKey,
 } from './types';
 
 export function uid(): ID {
@@ -23,9 +23,27 @@ const nowIso = () => new Date().toISOString();
 
 export const DEFAULT_METRICS: MetricType[] = [{ id: 'peso', name: 'Peso', unit: 'kg', decimals: 1 }];
 
+const emptyAccount = (): FinAccount => ({ periodStarts: [], budgets: {}, stamps: {} });
+
+export function emptyFinance(): FinanceState {
+  return { movements: [], recurring: [], accounts: { personal: emptyAccount(), hogar: emptyAccount() }, pending: [] };
+}
+
+function normalizeFinance(raw: Partial<FinanceState> | undefined): FinanceState {
+  const base = emptyFinance();
+  if (!raw || typeof raw !== 'object') return base;
+  const acc = (a: Partial<FinAccount> | undefined): FinAccount => ({ ...emptyAccount(), ...(a ?? {}), budgets: { ...(a?.budgets ?? {}) }, stamps: { ...(a?.stamps ?? {}) } });
+  return {
+    movements: raw.movements ?? [],
+    recurring: raw.recurring ?? [],
+    accounts: { personal: acc(raw.accounts?.personal), hogar: acc(raw.accounts?.hogar) },
+    pending: raw.pending ?? [],
+  };
+}
+
 export function createInitialState(): AppState {
   return {
-    version: 2,
+    version: 3,
     settings: {
       name: '',
       theme: 'auto',
@@ -59,6 +77,7 @@ export function createInitialState(): AppState {
     nutritionTargets: {},
     metricTypes: DEFAULT_METRICS.map((m) => ({ ...m })),
     metrics: [],
+    finance: emptyFinance(),
   };
 }
 
@@ -72,7 +91,7 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
   const s: AppState = {
     ...base,
     ...raw,
-    version: 2,
+    version: 3,
     settings,
     entries: (raw.entries ?? []).map((e) => ({ repeat: 'none', alert: null, ...(e as Partial<Entry>) }) as Entry),
     birthdays: raw.birthdays ?? [],
@@ -91,8 +110,10 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
     nutritionTargets: raw.nutritionTargets ?? {},
     metricTypes: raw.metricTypes?.length ? raw.metricTypes : DEFAULT_METRICS.map((m) => ({ ...m })),
     metrics: raw.metrics ?? [],
+    finance: normalizeFinance(raw.finance),
   };
   if ((raw.version ?? 1) < 2) migrateToV2(s);
+  if ((raw.version ?? 1) < 3) migrateToV3(s);
   return s;
 }
 
@@ -139,6 +160,12 @@ function migrateToV2(s: AppState) {
   }
 }
 
+/** v2 → v3: llegan las finanzas (un área «Finanzas» y la cuenta conjunta en Hogar). */
+function migrateToV3(s: AppState) {
+  for (const a of s.areas) if (a.template === 'home') insertModule(a.modules, 'jointMoney', 'chores');
+  if (s.settings.onboarded && !s.areas.some((a) => a.modules.includes('money'))) s.areas.push(newArea('money', s.areas.length));
+}
+
 /* ------------------------------------------------------------------ */
 /* Estado global + persistencia                                         */
 /* ------------------------------------------------------------------ */
@@ -169,6 +196,8 @@ export async function loadState(): Promise<AppState> {
   const raw = await kv.get<AppState>('state');
   state = normalizeState(raw);
   loaded = true;
+  // Datos de una versión anterior: se guardan ya convertidos (así las áreas nuevas no cambian de id).
+  if (raw && raw.version !== state.version) scheduleSave();
   emit();
   return state;
 }
@@ -316,29 +345,35 @@ export function restoreBirthday(b: Birthday) {
 
 // --- Áreas ---
 
-export function addArea(template: TemplateKey, overrides: Partial<Area> = {}): ID {
+function newArea(template: TemplateKey, order: number, overrides: Partial<Area> = {}): Area {
   const t = templateInfo(template);
-  const id = uid();
+  const area: Area = {
+    id: uid(),
+    name: t.name,
+    emoji: t.emoji,
+    color: t.color,
+    template,
+    modules: [...t.modules],
+    labels: t.labels ? { ...t.labels } : undefined,
+    showOnToday: true,
+    order,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    ...overrides,
+  };
+  if (area.modules.includes('menu') && !area.menu) area.menu = { meals: [...DEFAULT_MEALS], days: {} };
+  if (area.modules.includes('lifts') && !area.lifts) {
+    area.lifts = [];
+    area.rounding = 2.5;
+  }
+  return area;
+}
+
+export function addArea(template: TemplateKey, overrides: Partial<Area> = {}): ID {
+  let id = '';
   update((s) => {
-    const area: Area = {
-      id,
-      name: t.name,
-      emoji: t.emoji,
-      color: t.color,
-      template,
-      modules: [...t.modules],
-      labels: t.labels ? { ...t.labels } : undefined,
-      showOnToday: true,
-      order: s.areas.length,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-      ...overrides,
-    };
-    if (area.modules.includes('menu') && !area.menu) area.menu = { meals: [...DEFAULT_MEALS], days: {} };
-    if (area.modules.includes('lifts') && !area.lifts) {
-      area.lifts = [];
-      area.rounding = 2.5;
-    }
+    const area = newArea(template, s.areas.length, overrides);
+    id = area.id;
     s.areas.push(area);
   });
   return id;
@@ -792,5 +827,136 @@ export function deleteMetricEntry(id: ID) {
 export function restoreMetricEntry(e: MetricEntry) {
   update((s) => {
     if (!s.metrics.some((x) => x.id === e.id)) s.metrics.push(e);
+  }, { silent: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Finanzas                                                             */
+/* ------------------------------------------------------------------ */
+
+/** Lo de la cuenta conjunta se apunta para enviarlo a la hoja compartida. */
+function finShared(s: AppState, scope: FinScope, key: string) {
+  if (scope !== 'hogar') return;
+  if (!s.finance.pending.includes(key)) s.finance.pending.push(key);
+}
+
+function finUpdate(mutator: (s: AppState) => void, shared: boolean) {
+  update(mutator, { silent: true });
+  if (shared) for (const fn of listListeners) fn();
+}
+
+export type MovementInput = Omit<Movement, 'id' | 'updatedAt' | 'by'>;
+
+export function addMovement(input: MovementInput): ID {
+  const id = `M${uid()}`;
+  finUpdate((s) => {
+    s.finance.movements.push({ ...input, id, updatedAt: Date.now(), by: me() });
+    finShared(s, input.scope, `m:${id}`);
+  }, input.scope === 'hogar');
+  return id;
+}
+
+export function updateMovement(id: ID, patch: Partial<MovementInput>) {
+  const scope = state.finance.movements.find((m) => m.id === id)?.scope;
+  finUpdate((s) => {
+    const m = s.finance.movements.find((x) => x.id === id);
+    if (!m) return;
+    const before = m.scope;
+    Object.assign(m, patch, { updatedAt: Date.now(), by: me() });
+    // Si cambia de cuenta, la otra copia se borra en la hoja.
+    if (before !== m.scope && before === 'hogar') {
+      const copy = { ...m, id: `M${uid()}` };
+      Object.assign(m, { scope: 'hogar', deleted: true });
+      s.finance.movements.push(copy);
+      finShared(s, 'hogar', `m:${m.id}`);
+      return;
+    }
+    finShared(s, m.scope, `m:${m.id}`);
+  }, scope === 'hogar' || patch.scope === 'hogar');
+}
+
+export function deleteMovement(id: ID) {
+  const scope = state.finance.movements.find((m) => m.id === id)?.scope;
+  finUpdate((s) => {
+    const m = s.finance.movements.find((x) => x.id === id);
+    if (!m) return;
+    if (m.scope === 'hogar') {
+      Object.assign(m, { deleted: true, updatedAt: Date.now(), by: me() });
+      finShared(s, 'hogar', `m:${id}`);
+    } else s.finance.movements = s.finance.movements.filter((x) => x.id !== id);
+  }, scope === 'hogar');
+}
+
+export function restoreMovement(m: Movement) {
+  finUpdate((s) => {
+    const cur = s.finance.movements.find((x) => x.id === m.id);
+    if (cur) Object.assign(cur, { deleted: false, updatedAt: Date.now() });
+    else s.finance.movements.push({ ...m, deleted: false, updatedAt: Date.now() });
+    finShared(s, m.scope, `m:${m.id}`);
+  }, m.scope === 'hogar');
+}
+
+export type RecurringInput = Omit<Recurring, 'id' | 'updatedAt' | 'by'> & { id?: ID };
+
+export function saveRecurring(input: RecurringInput): ID {
+  const id = input.id ?? `F${uid()}`;
+  const prevScope = state.finance.recurring.find((r) => r.id === id)?.scope;
+  finUpdate((s) => {
+    const value: Recurring = { ...input, id, updatedAt: Date.now(), by: me() };
+    const i = s.finance.recurring.findIndex((r) => r.id === id);
+    if (i >= 0) s.finance.recurring[i] = value;
+    else s.finance.recurring.push(value);
+    finShared(s, input.scope, `f:${id}`);
+  }, input.scope === 'hogar' || prevScope === 'hogar');
+  return id;
+}
+
+export function deleteRecurring(id: ID) {
+  const scope = state.finance.recurring.find((r) => r.id === id)?.scope;
+  finUpdate((s) => {
+    const r = s.finance.recurring.find((x) => x.id === id);
+    if (!r) return;
+    if (r.scope === 'hogar') {
+      Object.assign(r, { deleted: true, updatedAt: Date.now(), by: me() });
+      finShared(s, 'hogar', `f:${id}`);
+    } else s.finance.recurring = s.finance.recurring.filter((x) => x.id !== id);
+  }, scope === 'hogar');
+}
+
+/** Un fijo que un mes concreto no se carga (o deshacerlo). */
+export function setRecurringSkip(id: ID, month: string, skipped: boolean) {
+  const scope = state.finance.recurring.find((r) => r.id === id)?.scope;
+  finUpdate((s) => {
+    const r = s.finance.recurring.find((x) => x.id === id);
+    if (!r) return;
+    const set = new Set(r.skips ?? []);
+    if (skipped) set.add(month);
+    else set.delete(month);
+    Object.assign(r, { skips: [...set].sort(), updatedAt: Date.now(), by: me() });
+    finShared(s, r.scope, `f:${id}`);
+  }, scope === 'hogar');
+}
+
+export type AccountPart = 'periods' | 'budgets' | 'balance';
+
+/** Cambia la configuración de una cuenta (periodos, presupuestos o saldo). */
+export function updateFinAccount(scope: FinScope, part: AccountPart, patch: Partial<Omit<FinAccount, 'stamps'>>) {
+  finUpdate((s) => {
+    const a = s.finance.accounts[scope];
+    Object.assign(a, patch);
+    if (part === 'periods') a.periodStarts = [...new Set(a.periodStarts)].sort();
+    a.stamps = { ...a.stamps, [part]: Date.now() };
+    finShared(s, scope, `c:${part}`);
+  }, scope === 'hogar');
+}
+
+/** Resultado de sincronizar la cuenta conjunta con la hoja. */
+export function applyFinanceSync(next: Pick<FinanceState, 'movements' | 'recurring' | 'pending'> & { hogar: FinAccount }, sharePatch: Partial<ShareConfig>) {
+  update((s) => {
+    s.finance.movements = next.movements;
+    s.finance.recurring = next.recurring;
+    s.finance.accounts.hogar = next.hogar;
+    s.finance.pending = next.pending;
+    if (s.share) s.share = { ...s.share, ...sharePatch };
   }, { silent: true });
 }

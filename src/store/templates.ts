@@ -61,8 +61,16 @@ export const TEMPLATES: TemplateInfo[] = [
     name: 'Hogar',
     emoji: '🏠',
     color: 'amber',
-    modules: ['shopping', 'chores', 'notes'],
-    description: 'Lista de la compra y tareas de casa, compartidas entre los dos móviles.',
+    modules: ['shopping', 'chores', 'jointMoney', 'notes'],
+    description: 'Lista de la compra, tareas de casa y la cuenta conjunta, compartidas entre los dos móviles.',
+  },
+  {
+    key: 'money',
+    name: 'Finanzas',
+    emoji: '💶',
+    color: 'teal',
+    modules: ['money', 'jointMoney', 'notes'],
+    description: 'Tus gastos y los de la cuenta conjunta, con objetivos de gasto y periodos que empiezan cuando cobras.',
   },
   {
     key: 'custom',
@@ -90,13 +98,15 @@ export const MODULE_INFO: Record<ModuleKey, { label: string; emoji: string; desc
   chores: { label: 'Tareas de casa', emoji: '🧹', description: 'Lo que hay que hacer en casa, compartido si queréis.' },
   diary: { label: 'Calorías y macros', emoji: '🔥', description: 'Apunta lo que comes con cantidades: calorías, proteína, hidratos y grasa.' },
   metrics: { label: 'Peso y medidas', emoji: '⚖️', description: 'Tu peso (y otras medidas) con la gráfica de cómo evoluciona.' },
+  money: { label: 'Mis finanzas', emoji: '💶', description: 'Tus gastos e ingresos, objetivos de gasto y fijos. Solo en tu móvil.' },
+  jointMoney: { label: 'Cuenta conjunta', emoji: '🤝', description: 'Hipoteca, facturas y gastos de casa, compartidos entre los dos móviles.' },
 };
 
 export function moduleLabel(area: Pick<Area, 'labels'>, m: ModuleKey): string {
   return area.labels?.[m] ?? MODULE_INFO[m].label;
 }
 
-export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'diary', 'metrics', 'shopping', 'chores', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
+export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'diary', 'metrics', 'shopping', 'chores', 'money', 'jointMoney', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
 
 export const AREA_COLORS: AreaColor[] = ['violet', 'blue', 'teal', 'green', 'amber', 'orange', 'rose', 'pink', 'slate'];
 

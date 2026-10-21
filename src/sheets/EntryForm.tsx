@@ -3,13 +3,29 @@ import { useState } from 'react';
 import { CATEGORIES } from '../lib/categories';
 import { ALLDAY_ALERTS, formatAlert, TIMED_ALERTS } from '../lib/dates';
 import { REPEAT_LABELS } from '../lib/recurrence';
-import { sortedAreas } from '../store/selectors';
+import { PLANS_SCRIPT } from '../lib/planSync';
+import { partnerName, sortedAreas } from '../store/selectors';
 import { getState } from '../store/store';
 import type { Entry, EntryKind, Repeat } from '../store/types';
 
 export type EntryDraft = Pick<
   Entry,
-  'kind' | 'title' | 'date' | 'time' | 'endTime' | 'endDate' | 'repeat' | 'repeatUntil' | 'alert' | 'areaId' | 'category' | 'location' | 'url' | 'notes' | 'important'
+  | 'kind'
+  | 'title'
+  | 'date'
+  | 'time'
+  | 'endTime'
+  | 'endDate'
+  | 'repeat'
+  | 'repeatUntil'
+  | 'alert'
+  | 'areaId'
+  | 'category'
+  | 'location'
+  | 'url'
+  | 'notes'
+  | 'important'
+  | 'shared'
 >;
 
 export const KIND_OPTIONS: { value: EntryKind; label: string; emoji: string; hint: string }[] = [
@@ -25,6 +41,32 @@ export function fixAlert(d: EntryDraft, prevTime: string | undefined, defaultAle
   if (hasTime && !hadTime) return d.alert !== null && ALLDAY_ALERTS.includes(d.alert) ? defaultAlert : (d.alert ?? (d.kind === 'task' ? null : defaultAlert));
   if (!hasTime && hadTime) return d.alert !== null && ALLDAY_ALERTS.includes(d.alert) ? d.alert : null;
   return d.alert;
+}
+
+/** «Plan en pareja»: solo si hay hogar compartido. */
+function SharedSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const s = getState();
+  if (!s.share) return null;
+  const partner = partnerName(s);
+  const old = (s.share.scriptVersion ?? PLANS_SCRIPT) < PLANS_SCRIPT;
+  return (
+    <label className="switch-row mt8">
+      <div className="grow">
+        <div className="t">👥 {partner ? `Compartir con ${partner}` : 'Plan en pareja'}</div>
+        <div className="d" style={old && on ? { color: 'var(--warning)' } : undefined}>
+          {old && on
+            ? 'Se enviará cuando pongáis el código nuevo de la hoja (Ajustes → Hogar compartido).'
+            : partner
+              ? 'Le aparecerá también en su agenda.'
+              : 'Lo veréis los dos, cada uno en su móvil.'}
+        </div>
+      </div>
+      <span className="switch">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+        <span />
+      </span>
+    </label>
+  );
 }
 
 export function EntryFields(props: {
@@ -136,6 +178,8 @@ export function EntryFields(props: {
       {d.date && !d.time && d.kind !== 'task' && d.alert === null && (
         <p className="hint">Para que te avise el mismo día, ponle una hora.</p>
       )}
+
+      <SharedSwitch on={!!d.shared} onChange={(shared) => onChange({ shared })} />
 
       <button type="button" className="link-btn mt12" onClick={() => setMore(!more)} aria-expanded={more}>
         {more ? <ChevronUp size={16} style={{ verticalAlign: -3 }} /> : <ChevronDown size={16} style={{ verticalAlign: -3 }} />} Más opciones

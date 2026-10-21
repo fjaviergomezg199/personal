@@ -2,6 +2,7 @@ import { Copy, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { confirmDialog, Segmented, Sheet, toast } from '../components/ui';
 import { copyText, shareText } from '../lib/files';
+import { PLANS_SCRIPT } from '../lib/planSync';
 import { appsScriptCode } from '../lib/shareScript';
 import { fetchSharedItems, makeJoinCode, newShareKey, readJoinCode, SHARE_URL_RE, ShareError, syncShare } from '../lib/shareSync';
 import { addArea, getState, setShare, useApp } from '../store/store';
@@ -51,7 +52,8 @@ export function HomeShareSheet({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            La lista de la compra, las tareas de casa y la cuenta conjunta se guardan en una hoja de cálculo de Google vuestra, y los dos móviles la usan. Lo configura{' '}
+            La lista de la compra, las tareas de casa, la cuenta conjunta y los planes en pareja se guardan en una hoja de cálculo de Google vuestra, y los dos móviles
+            la usan. Lo configura{' '}
             <b>uno de los dos</b> (mejor desde el ordenador) y el otro se une con un código.
           </p>
           <Segmented
@@ -253,7 +255,8 @@ function Manage({ share, onClose }: { share: ShareConfig; onClose: () => void })
 
 /** Para pasar a una versión nueva del código de la hoja (la dirección no cambia). */
 function ScriptUpdate({ share }: { share: ShareConfig }) {
-  const old = (share.scriptVersion ?? 3) < 3;
+  const version = share.scriptVersion ?? PLANS_SCRIPT;
+  const old = version < PLANS_SCRIPT;
   const [open, setOpen] = useState(old);
   const code = appsScriptCode(share.key);
   return (
@@ -262,7 +265,8 @@ function ScriptUpdate({ share }: { share: ShareConfig }) {
         <>
           <div style={{ fontWeight: 700 }}>Actualiza el código de la hoja</div>
           <p className="small" style={{ margin: '4px 0 0' }}>
-            La hoja tiene el código antiguo: la lista funciona, pero para compartir también la <b>cuenta conjunta</b> hay que poner el nuevo (2 minutos, mejor desde el
+            La hoja tiene el código antiguo: la lista funciona, pero para compartir también {version < 3 ? <><b>la cuenta conjunta</b> y </> : ''}
+            <b>los planes en pareja</b> hay que poner el nuevo (2 minutos, mejor desde el
             ordenador).
           </p>
         </>

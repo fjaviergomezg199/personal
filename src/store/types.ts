@@ -40,6 +40,10 @@ export interface Entry {
   google?: GoogleLink;
   /** Pendiente de enviar a Google Calendar. */
   dirty?: boolean;
+  /** Plan en pareja: se comparte por el hogar compartido y lo ven los dos. */
+  shared?: boolean;
+  /** Quién lo cambió por última vez (en los compartidos). */
+  by?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,7 +193,7 @@ export interface ShareConfig {
   error?: string;
   /** Hora de la hoja en la última sincronización (para pedir solo lo nuevo). */
   since?: number;
-  /** Versión del código de la hoja (la 2 no comparte las finanzas). */
+  /** Versión del código de la hoja (la 2 no comparte las finanzas; la 3, los planes). */
   scriptVersion?: number;
 }
 
@@ -415,6 +419,10 @@ export interface AppState {
   /** Ids de elementos de las listas cambiados aquí y aún no enviados. */
   listPending: ID[];
   share?: ShareConfig;
+  /** Planes en pareja cambiados aquí y aún no enviados. */
+  planPending: ID[];
+  /** Planes en pareja borrados aquí (para que se borren también en el otro móvil). */
+  planGone: { id: ID; at: number }[];
   foodLog: FoodLogItem[];
   customFoods: CustomFood[];
   nutritionTargets: NutritionTargets;

@@ -4,20 +4,27 @@
  * se publica como aplicación web. La clave va dentro del código.
  */
 export function appsScriptCode(key: string): string {
-  return `// Día a Día · Hogar compartido (versión 3)
-// Lista de la compra, tareas de casa y cuenta conjunta, compartidas entre vuestros móviles.
+  return `// Día a Día · Hogar compartido (versión 4)
+// Lista de la compra, tareas de casa, cuenta conjunta y planes en pareja, compartidos entre vuestros móviles.
 // No cambies nada: pega todo esto en Extensiones → Apps Script y guarda.
 
 const CLAVE = '${key}';
-const VERSION = 3;
+const VERSION = 4;
 const HOJA = 'Lista';
 const COLUMNAS = ['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado'];
-// Cuenta conjunta: una hoja por tipo de dato (se pueden mirar, pero mejor no tocarlas a mano).
+// Lo demás va en una hoja por tipo de dato (se pueden mirar, pero mejor no tocarlas a mano).
+// Si una versión nueva de la app guarda algo más, su hoja y sus columnas se crean solas:
+// no hará falta volver a cambiar este código.
 const REGISTROS = {
   Movimientos: ['id', 'fecha', 'importe', 'tipo', 'categoria', 'concepto', 'fijo', 'por', 'actualizado', 'borrado', 'recibido'],
   Fijos: ['id', 'nombre', 'importe', 'tipo', 'categoria', 'dia', 'cada', 'desde', 'saltos', 'activo', 'por', 'actualizado', 'borrado', 'recibido'],
   Cuenta: ['id', 'datos', 'por', 'actualizado', 'borrado', 'recibido'],
+  Planes: ['id', 'tipo', 'titulo', 'fecha', 'hora', 'horaFin', 'fechaFin', 'repite', 'repiteHasta', 'lugar', 'enlace', 'notas', 'categoria', 'importante', 'hecho', 'hechoDias', 'aviso', 'por', 'actualizado', 'borrado', 'recibido'],
 };
+const NOMBRE = /^[A-Z][A-Za-z]{2,30}$/;
+const COLUMNA = /^[a-z][A-Za-z]{0,30}$/;
+const MAX_HOJAS = 30;
+const MAX_COLUMNAS = 26;
 
 function hoja_() {
   const libro = SpreadsheetApp.getActiveSpreadsheet();
@@ -96,46 +103,76 @@ function guardarLista_(cambios) {
   }
 }
 
-function hojaDe_(nombre) {
+// Una hoja de registros empieza por «id» y tiene «recibido» (así no se toca ninguna otra pestaña).
+function esRegistro_(cabecera) {
+  const cab = (cabecera || []).map(String);
+  return cab[0] === 'id' && cab.indexOf('recibido') >= 0;
+}
+
+function columnasNuevas_(nombre, lista) {
+  if (REGISTROS[nombre]) return REGISTROS[nombre].slice();
+  const columnas = ['id'];
+  for (let k = 0; k < lista.length; k++) {
+    for (const c in lista[k]) if (COLUMNA.test(c) && c !== 'recibido' && columnas.indexOf(c) < 0) columnas.push(c);
+  }
+  ['actualizado', 'borrado'].forEach(function (c) {
+    if (columnas.indexOf(c) < 0) columnas.push(c);
+  });
+  columnas.push('recibido');
+  return columnas.slice(0, MAX_COLUMNAS);
+}
+
+function hojaDe_(nombre, lista) {
   const libro = SpreadsheetApp.getActiveSpreadsheet();
   let hoja = libro.getSheetByName(nombre);
   if (!hoja) {
+    if (libro.getSheets().length >= MAX_HOJAS) return null;
     hoja = libro.insertSheet(nombre);
     hoja.getRange('A:Z').setNumberFormat('@');
-    hoja.appendRow(REGISTROS[nombre]);
+    hoja.appendRow(columnasNuevas_(nombre, lista));
     hoja.setFrozenRows(1);
   }
   return hoja;
 }
 
-function leerRegistros_(nombre, desde) {
-  const columnas = REGISTROS[nombre];
-  const filas = hojaDe_(nombre).getDataRange().getValues();
-  const iRec = columnas.indexOf('recibido');
+function leerRegistros_(filas, desde) {
+  const cab = filas[0].map(String);
+  const iRec = cab.indexOf('recibido');
   const lista = [];
   for (let i = 1; i < filas.length; i++) {
     const f = filas[i];
     if (!f[0]) continue;
     if (desde && (Number(f[iRec]) || 0) <= desde) continue;
     const r = {};
-    for (let c = 0; c < columnas.length; c++) r[columnas[c]] = f[c] === undefined || f[c] === null ? '' : String(f[c]);
+    for (let c = 0; c < cab.length; c++) if (cab[c]) r[cab[c]] = f[c] === undefined || f[c] === null ? '' : String(f[c]);
     lista.push(r);
   }
   return lista;
 }
 
-function guardarRegistros_(nombre, lista, ahora) {
-  const columnas = REGISTROS[nombre];
-  const hoja = hojaDe_(nombre);
+function guardarRegistros_(hoja, lista, ahora) {
   const filas = hoja.getDataRange().getValues();
-  const iAct = columnas.indexOf('actualizado');
-  const iBorr = columnas.indexOf('borrado');
+  if (!filas.length || !esRegistro_(filas[0])) return;
+  const cab = filas[0].map(String);
+  // Datos nuevos de una versión nueva de la app: columnas al final.
+  let nuevas = false;
+  for (let k = 0; k < lista.length; k++) {
+    for (const c in lista[k]) {
+      if (COLUMNA.test(c) && cab.indexOf(c) < 0 && cab.length < MAX_COLUMNAS) {
+        cab.push(c);
+        nuevas = true;
+      }
+    }
+  }
+  if (nuevas) hoja.getRange(1, 1, 1, cab.length).setValues([cab]);
+  const iAct = cab.indexOf('actualizado');
+  const iBorr = cab.indexOf('borrado');
   const fila = {};
   for (let i = 1; i < filas.length; i++) fila[String(filas[i][0])] = i;
   for (let k = 0; k < lista.length; k++) {
     const r = lista[k];
     if (!r || !r.id) continue;
-    const valores = columnas.map(function (c) {
+    const valores = cab.map(function (c) {
       return c === 'recibido' ? String(ahora) : texto_(r[c]);
     });
     const i = fila[String(r.id)];
@@ -149,6 +186,7 @@ function guardarRegistros_(nombre, lista, ahora) {
       filas[i] = valores;
     }
   }
+  if (iBorr < 0) return;
   const limite = ahora - 30 * 86400000;
   for (let i = filas.length - 1; i >= 1; i--) {
     if (siNo_(filas[i][iBorr]) && (Number(filas[i][iAct]) || 0) < limite) hoja.deleteRow(i + 1);
@@ -157,7 +195,14 @@ function guardarRegistros_(nombre, lista, ahora) {
 
 function todo_(desde) {
   const registros = {};
-  for (const nombre in REGISTROS) registros[nombre] = leerRegistros_(nombre, desde);
+  const hojas = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  for (let h = 0; h < hojas.length; h++) {
+    const nombre = hojas[h].getName();
+    if (nombre === HOJA || !NOMBRE.test(nombre)) continue;
+    const filas = hojas[h].getDataRange().getValues();
+    if (filas.length && esRegistro_(filas[0])) registros[nombre] = leerRegistros_(filas, desde);
+  }
+  for (const nombre in REGISTROS) if (!registros[nombre]) registros[nombre] = [];
   return { ok: true, version: VERSION, items: leer_(hoja_()), registros: registros, ahora: Date.now() };
 }
 
@@ -190,8 +235,11 @@ function doPost(e) {
     const ahora = Date.now();
     guardarLista_(cuerpo.cambios || []);
     const registros = cuerpo.registros || {};
-    for (const nombre in REGISTROS) {
-      if (Array.isArray(registros[nombre]) && registros[nombre].length) guardarRegistros_(nombre, registros[nombre], ahora);
+    for (const nombre in registros) {
+      const lista = registros[nombre];
+      if (nombre === HOJA || !NOMBRE.test(nombre) || !Array.isArray(lista) || !lista.length) continue;
+      const hoja = hojaDe_(nombre, lista);
+      if (hoja) guardarRegistros_(hoja, lista, ahora);
     }
     return respuesta_(todo_(Number(cuerpo.desde) || 0));
   } finally {

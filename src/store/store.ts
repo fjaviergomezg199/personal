@@ -2,12 +2,13 @@ import { useSyncExternalStore } from 'react';
 import { addDays, todayISO, weekKey, monthKey } from '../lib/dates';
 import { aliasesFor } from '../lib/lifts';
 import { sameItem } from '../lib/menuShopping';
+import { planVersion, sameShared } from '../lib/planSync';
 import { DEFAULT_MEALS } from '../lib/importers';
 import { files, kv } from './db';
 import { templateInfo } from './templates';
 import type {
   AppState, Area, Birthday, Habit, CustomFood, DocMeta, Entry, FinAccount, FinanceState, FinScope, FoodLogItem, Goal, GoogleCalendarInfo,
-  GoogleEvent, GoogleSettings, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
+  GoogleEvent, GoogleLink, GoogleSettings, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
   NutritionTargets, PlanItem, Recurring, Settings, ShareConfig, TemplateKey,
 } from './types';
 
@@ -72,6 +73,8 @@ export function createInitialState(): AppState {
     notified: {},
     listItems: [],
     listPending: [],
+    planPending: [],
+    planGone: [],
     foodLog: [],
     customFoods: [],
     nutritionTargets: {},
@@ -107,6 +110,8 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
     notified: raw.notified ?? {},
     listItems: raw.listItems ?? [],
     listPending: raw.listPending ?? [],
+    planPending: raw.planPending ?? [],
+    planGone: raw.planGone ?? [],
     foodLog: raw.foodLog ?? [],
     customFoods: raw.customFoods ?? [],
     nutritionTargets: raw.nutritionTargets ?? {},
@@ -263,27 +268,65 @@ export function updateGoogle(patch: Partial<GoogleSettings>) {
 
 export type EntryInput = Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>;
 
+// Los planes en pareja se apuntan para enviarlos a la hoja compartida (y avisar al otro móvil).
+function planChanged(s: AppState, id: ID) {
+  if (!s.planPending.includes(id)) s.planPending.push(id);
+}
+
+const shareListeners = () => {
+  for (const fn of listListeners) fn();
+};
+
 export function addEntry(input: EntryInput): ID {
   const id = uid();
   update((s) => {
-    s.entries.push({ ...input, id, createdAt: nowIso(), updatedAt: nowIso(), dirty: true });
+    s.entries.push({ ...input, id, createdAt: nowIso(), updatedAt: nowIso(), dirty: true, ...(input.shared ? { by: me() } : {}) });
+    if (input.shared) planChanged(s, id);
   });
+  if (input.shared) shareListeners();
   return id;
 }
 
 export function updateEntry(id: ID, patch: Partial<Entry>) {
+  let shared = false;
   update((s) => {
     const e = s.entries.find((x) => x.id === id);
-    if (e) Object.assign(e, patch, { updatedAt: nowIso(), dirty: true });
+    if (!e) return;
+    const before = { ...e };
+    Object.assign(e, patch, { updatedAt: nowIso(), dirty: true });
+    // El aviso y el área son de cada uno: solo se envía si cambia lo que ven los dos.
+    if ((before.shared || e.shared) && (!!before.shared !== !!e.shared || !sameShared(before, e))) {
+      if (e.shared) e.by = me();
+      planChanged(s, id);
+      shared = true;
+    }
   });
+  if (shared) shareListeners();
+}
+
+/** Quita elementos de la agenda; los compartidos se borran también en el otro móvil. */
+function removeEntries(s: AppState, ids: Set<ID>) {
+  const t = Date.now();
+  for (const e of s.entries) {
+    if (!ids.has(e.id)) continue;
+    if (e.google) s.googleDeletes.push(e.google);
+    if (e.shared) {
+      s.planGone = [...s.planGone.filter((g) => g.id !== e.id), { id: e.id, at: Math.max(t, planVersion(e) + 1) }];
+      planChanged(s, e.id);
+    }
+  }
+  s.entries = s.entries.filter((x) => !ids.has(x.id));
 }
 
 export function deleteEntry(id: ID) {
-  update((s) => {
-    const e = s.entries.find((x) => x.id === id);
-    if (e?.google) s.googleDeletes.push(e.google);
-    s.entries = s.entries.filter((x) => x.id !== id);
-  });
+  deleteEntries([id]);
+}
+
+export function deleteEntries(ids: ID[]) {
+  const set = new Set(ids);
+  const shared = state.entries.some((e) => set.has(e.id) && e.shared);
+  update((s) => removeEntries(s, set));
+  if (shared) shareListeners();
 }
 
 /** Deshacer un borrado. */
@@ -291,14 +334,26 @@ export function restoreEntry(entry: Entry) {
   update((s) => {
     if (s.entries.some((e) => e.id === entry.id)) return;
     if (entry.google) s.googleDeletes = s.googleDeletes.filter((d) => d.id !== entry.google!.id);
-    s.entries.push({ ...entry, dirty: true });
+    if (entry.shared) {
+      // Más nuevo que el borrado, por si ya había llegado a la hoja.
+      const gone = s.planGone.find((g) => g.id === entry.id)?.at ?? 0;
+      s.planGone = s.planGone.filter((g) => g.id !== entry.id);
+      s.entries.push({ ...entry, dirty: true, by: me(), updatedAt: new Date(Math.max(Date.now(), gone + 1)).toISOString() });
+      planChanged(s, entry.id);
+    } else s.entries.push({ ...entry, dirty: true });
   });
+  if (entry.shared) shareListeners();
 }
 
 export function toggleEntryDone(id: ID, date?: ISODate) {
+  const shared = !!state.entries.find((x) => x.id === id)?.shared;
   update((s) => {
     const e = s.entries.find((x) => x.id === id);
     if (!e) return;
+    if (e.shared) {
+      e.by = me();
+      planChanged(s, id);
+    }
     if (e.repeat !== 'none' && date) {
       const set = new Set(e.doneDates ?? []);
       if (set.has(date)) set.delete(date);
@@ -312,6 +367,21 @@ export function toggleEntryDone(id: ID, date?: ISODate) {
     }
     e.updatedAt = nowIso();
   });
+  if (shared) shareListeners();
+}
+
+/** Resultado de sincronizar los planes en pareja con la hoja. */
+export function applyPlanSync(r: { entries: Entry[]; pending: ID[]; gone: { id: ID; at: number }[]; googleDeletes: GoogleLink[]; changed: boolean }) {
+  update(
+    (s) => {
+      s.entries = r.entries;
+      s.planPending = r.pending;
+      s.planGone = r.gone;
+      s.googleDeletes.push(...r.googleDeletes);
+    },
+    // Lo que llega del otro móvil va también a Google Calendar.
+    { silent: !r.changed },
+  );
 }
 
 // --- Cumpleaños ---
@@ -413,6 +483,8 @@ export function moveArea(id: ID, delta: number) {
 export function deleteArea(id: ID) {
   const docIds = state.docs.filter((d) => d.areaId === id).map((d) => d.id);
   update((s) => {
+    // Los planes en pareja no se borran: el área es solo de este móvil.
+    for (const e of s.entries) if (e.areaId === id && e.shared) delete e.areaId;
     for (const e of s.entries) if (e.areaId === id && e.google) s.googleDeletes.push(e.google);
     s.entries = s.entries.filter((e) => e.areaId !== id);
     s.areas = s.areas.filter((a) => a.id !== id);
@@ -701,8 +773,15 @@ export function restoreListItems(ids: ID[]) {
 export function setShare(share: ShareConfig | undefined) {
   update((s) => {
     s.share = share;
-    // Al empezar a compartir se envía todo lo que había en este móvil.
-    if (share) s.listPending = s.listItems.map((i) => i.id);
+    if (!share) return;
+    // Al empezar a compartir se envía todo lo que había en este móvil (también si es otra hoja).
+    s.listPending = s.listItems.map((i) => i.id);
+    for (const m of s.finance.movements) if (m.scope === 'hogar') finShared(s, 'hogar', `m:${m.id}`);
+    for (const f of s.finance.recurring) if (f.scope === 'hogar') finShared(s, 'hogar', `f:${f.id}`);
+    const stamps = s.finance.accounts.hogar.stamps;
+    for (const part of ['periods', 'budgets', 'balance'] as const) if (stamps[part]) finShared(s, 'hogar', `c:${part}`);
+    for (const e of s.entries) if (e.shared) planChanged(s, e.id);
+    for (const g of s.planGone) planChanged(s, g.id);
   }, { silent: true });
 }
 

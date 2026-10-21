@@ -8,6 +8,7 @@ import { googleTemplateUrl } from '../lib/google';
 import { entryToIcs, icsFileName } from '../lib/ics';
 import { isDoneOn } from '../lib/recurrence';
 import { rrule } from '../lib/sync';
+import { partnerName } from '../store/selectors';
 import { deleteEntry, restoreEntry, toggleEntryDone, updateEntry, useApp } from '../store/store';
 import type { Entry, ID, ISODate } from '../store/types';
 import { EntryFields, type EntryDraft } from './EntryForm';
@@ -15,8 +16,8 @@ import { EntryFields, type EntryDraft } from './EntryForm';
 const KIND_TITLE: Record<Entry['kind'], string> = { reminder: 'Recordatorio', event: 'Plan', task: 'Tarea' };
 
 function toDraft(e: Entry): EntryDraft {
-  const { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important } = e;
-  return { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important };
+  const { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important, shared } = e;
+  return { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important, shared };
 }
 
 export function entryShareText(e: Entry): string {
@@ -53,11 +54,14 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
     props.onClose();
   };
 
+  const together = !!entry.shared && !!state.share;
+  const partner = together ? partnerName(state) : undefined;
+
   const remove = () => {
     const copy = structuredClone(entry);
     deleteEntry(entry.id);
     props.onClose();
-    toast('Borrado', { action: 'Deshacer', onAction: () => restoreEntry(copy) });
+    toast(together ? 'Borrado para los dos' : 'Borrado', { action: 'Deshacer', onAction: () => restoreEntry(copy) });
   };
 
   const gUrl = entry.date
@@ -139,6 +143,13 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
           </>
         )}
       </div>
+      {together && (
+        <p className="hint center mt12">
+          👥 En pareja{partner ? ` con ${partner}` : ''}
+          {entry.by && entry.by !== state.settings.name.trim() ? ` · último cambio de ${entry.by}` : ''}
+          {state.planPending.includes(entry.id) ? ' · ⏳ pendiente de enviar' : ''}
+        </p>
+      )}
       {syncing && entry.date && (
         <p className="hint center mt12">
           {entry.google && !entry.dirty ? '✓ En tu Google Calendar' : '⏳ Pendiente de enviar a Google Calendar'}

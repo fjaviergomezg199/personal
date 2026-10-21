@@ -54,7 +54,7 @@ function blockFor(item: AgendaItem): Omit<Block, 'col' | 'cols'> | null {
         item,
         start,
         end,
-        title: `${entryEmoji(e)} ${e.title}`,
+        title: `${entryEmoji(e)} ${e.title}${e.shared ? ' 👥' : ''}`,
         label: `${item.time}${e.endTime ? `–${e.endTime}` : ''}`,
         done: item.done,
         tone: item.area?.color ?? (e.category ? CATEGORY_TONE[e.category] : undefined),

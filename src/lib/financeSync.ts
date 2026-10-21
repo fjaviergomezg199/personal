@@ -9,10 +9,12 @@ import { isISODate } from './dates';
 
 export type Row = Record<string, string>;
 
+/** Lo que va a las hojas de registros (una pestaña por tipo). */
 export interface SharedRecords {
   Movimientos?: Row[];
   Fijos?: Row[];
   Cuenta?: Row[];
+  Planes?: Row[];
 }
 
 const yes = (v: string | undefined) => v === 'true' || v === 'TRUE';
@@ -125,7 +127,7 @@ function applyPart(a: FinAccount, part: Part, raw: string): FinAccount {
 /** Lo pendiente de enviar, y con qué versión se envía cada cosa. */
 export function financeOutbox(fin: FinanceState, by?: string): { records: SharedRecords; sent: Map<string, number> } {
   const sent = new Map<string, number>();
-  const records: Required<SharedRecords> = { Movimientos: [], Fijos: [], Cuenta: [] };
+  const records: Required<Pick<SharedRecords, 'Movimientos' | 'Fijos' | 'Cuenta'>> = { Movimientos: [], Fijos: [], Cuenta: [] };
   for (const key of fin.pending) {
     const [type, id] = [key.slice(0, 1), key.slice(2)];
     if (type === 'm') {

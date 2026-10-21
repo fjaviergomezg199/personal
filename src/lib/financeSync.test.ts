@@ -16,7 +16,7 @@ const fixed = (p: Partial<Recurring>): Recurring => ({
 async function sync(g: ReturnType<typeof fakeGoogle>, fin: FinanceState, opts: { full?: boolean; since?: number } = {}) {
   const out = financeOutbox(fin, 'yo');
   const server = await exchange(g.share, [], out.records, opts.full === false ? Math.max(0, (opts.since ?? 0) - 120000) : 0, g.fetchImpl);
-  expect(server.version).toBe(3);
+  expect(server.version).toBe(4);
   const m = mergeFinance(fin, out.sent, server.registros!, opts.full !== false);
   const next: FinanceState = { ...fin, movements: m.movements, recurring: m.recurring, pending: m.pending, accounts: { ...fin.accounts, hogar: m.hogar } };
   return { fin: next, since: server.ahora!, server };

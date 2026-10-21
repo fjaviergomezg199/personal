@@ -5,7 +5,7 @@ import { confirmDialog, Empty, toast } from '../components/ui';
 import { todayISO } from '../lib/dates';
 import { parseQuick } from '../lib/quickParse';
 import { areaTasks } from '../store/selectors';
-import { addEntry, getState, update, useApp } from '../store/store';
+import { addEntry, deleteEntries, getState, useApp } from '../store/store';
 import { moduleLabel } from '../store/templates';
 import type { Area, Entry } from '../store/types';
 
@@ -55,11 +55,7 @@ export function TasksModule({ area }: { area: Area }) {
   const clearDone = async () => {
     const ok = await confirmDialog({ title: `¿Quitar ${done.length} hechas?`, confirm: 'Quitar', danger: true });
     if (!ok) return;
-    const ids = new Set(done.map((d) => d.id));
-    update((s) => {
-      for (const e of s.entries) if (ids.has(e.id) && e.google) s.googleDeletes.push(e.google);
-      s.entries = s.entries.filter((e) => !ids.has(e.id));
-    });
+    deleteEntries(done.map((d) => d.id));
     toast('Hechas eliminadas');
   };
 

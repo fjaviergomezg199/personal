@@ -11,6 +11,7 @@ export function fakeGoogle(key = 'CLAVE123') {
   // Como en Sheets: el apóstrofo inicial solo evita fórmulas, no se guarda.
   const clean = (row: Cell[]) => row.map((v) => (typeof v === 'string' && v.startsWith("'") ? v.slice(1) : v));
   const sheet = (name: string) => ({
+    getName: () => name,
     appendRow: (row: Cell[]) => void sheets[name].push(clean(row)),
     getDataRange: () => ({ getValues: () => sheets[name].map((r) => [...r]) }),
     getRange: (a: string | number, _col?: number) =>
@@ -23,6 +24,7 @@ export function fakeGoogle(key = 'CLAVE123') {
   const SpreadsheetApp = {
     getActiveSpreadsheet: () => ({
       getSheetByName: (n: string) => (sheets[n] ? sheet(n) : null),
+      getSheets: () => Object.keys(sheets).map(sheet),
       insertSheet: (n: string) => {
         sheets[n] = [];
         return sheet(n);

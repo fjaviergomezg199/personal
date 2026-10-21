@@ -1,8 +1,19 @@
 import { useSyncExternalStore } from 'react';
 import { toast } from '../components/ui';
-import { getState } from '../store/store';
+import { getState, updateSettings } from '../store/store';
 import { backupToDrive, driveBackupDue, driveBackupOverdue, setDriveRestoreOpen } from './driveBackup';
-import { beginGoogleAuth, canAutoAuth, DRIVE_SCOPE, hasScope, hasValidToken, recordAutoAuth, resetAutoAuth, type AfterAuth, type RedirectResult } from './google';
+import {
+  beginGoogleAuth,
+  canAutoAuth,
+  DRIVE_SCOPE,
+  hasScope,
+  hasValidToken,
+  recordAutoAuth,
+  resetAutoAuth,
+  scopeGranted,
+  type AfterAuth,
+  type RedirectResult,
+} from './google';
 import { pendingGoogleChanges, syncGoogle } from './sync';
 
 /** Orquesta la sincronización con Google y su estado para la interfaz. */
@@ -42,16 +53,31 @@ export function googleLinked(): boolean {
   return googleConfigured() && !!g.email;
 }
 
-/** Con la copia en Drive activada, el permiso de Google incluye Drive. */
-const wantsDrive = () => !!getState().settings.drive?.on;
+/**
+ * Con la copia en Drive activada (y el permiso de Drive ya dado alguna vez), al
+ * renovar el permiso de Google se pide también Drive. Si nunca se dio, pedirlo
+ * sin pantallas fallaría y dejaría sin renovar también el de Calendar.
+ */
+const wantsDrive = () => !!getState().settings.drive?.on && scopeGranted(DRIVE_SCOPE);
 
 export function connectGoogle(opts: { silentFirst?: boolean; then?: AfterAuth } = {}) {
   const g = getState().settings.google;
   if (!g.clientId) return;
   resetAutoAuth();
   const drive = wantsDrive() || !!opts.then;
-  if (opts.silentFirst && g.email) beginGoogleAuth(g.clientId, { silent: true, email: g.email, fallback: true, drive, then: opts.then });
+  // Un permiso nuevo (Drive por primera vez) necesita la pantalla de Google.
+  const silent = opts.silentFirst && g.email && (!opts.then || scopeGranted(DRIVE_SCOPE));
+  if (silent) beginGoogleAuth(g.clientId, { silent: true, email: g.email, fallback: true, drive, then: opts.then });
   else beginGoogleAuth(g.clientId, { email: g.email, drive, then: opts.then });
+}
+
+/** Volvió de Google sin el permiso de Drive (lo desmarcó o no lo dio). */
+function driveRefused(then: AfterAuth) {
+  if (then === 'drive-backup') {
+    const d = getState().settings.drive;
+    if (d?.on) updateSettings({ drive: { ...d, on: false } });
+    toast('Sin permiso para Google Drive no se puede guardar la copia allí: la copia automática queda desactivada.', { duration: 8000 });
+  } else toast('Sin permiso para Google Drive no se pueden ver tus copias.', { duration: 7000 });
 }
 
 /** Copia en Drive. A mano (`manual`) se hace aunque no haya cambios y se avisa de cómo ha ido. */
@@ -101,9 +127,11 @@ export function handleRedirectResult(r: RedirectResult) {
   if (r.status === 'ok') {
     resetAutoAuth();
     set({ needsAuth: false });
-    if (r.then === 'drive-restore') setDriveRestoreOpen(true);
+    const driveOk = hasScope(DRIVE_SCOPE);
+    if (r.then && !driveOk) driveRefused(r.then);
+    else if (r.then === 'drive-restore') setDriveRestoreOpen(true);
     void runSync().then(() => {
-      if (r.then === 'drive-backup') void runDriveBackup({ manual: true });
+      if (r.then === 'drive-backup' && driveOk) void runDriveBackup({ manual: true });
       else if (!r.then && !status.error) toast('Conectado con Google Calendar ✓');
       if (!r.then) void runDriveBackup();
     });
@@ -135,7 +163,7 @@ export function handleRedirectResult(r: RedirectResult) {
 export function maybeAutoReconnect(): boolean {
   const g = getState().settings.google;
   if (!googleLinked() || !g.autoReconnect || hasValidToken()) return false;
-  if ((pendingGoogleChanges() === 0 && !driveBackupOverdue()) || !canAutoAuth()) return false;
+  if ((pendingGoogleChanges() === 0 && !(wantsDrive() && driveBackupOverdue())) || !canAutoAuth()) return false;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
   if (document.visibilityState !== 'visible') return false;
   recordAutoAuth(false);

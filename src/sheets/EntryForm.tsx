@@ -34,6 +34,20 @@ export const KIND_OPTIONS: { value: EntryKind; label: string; emoji: string; hin
   { value: 'task', label: 'Tarea', emoji: '✅', hint: 'Pendiente, con fecha o sin ella' },
 ];
 
+/**
+ * Solo lo que se ha cambiado desde que se abrió (así no se pisa lo que haya
+ * cambiado mientras tanto el otro móvil en un plan en pareja).
+ */
+export function changedFields(initial: EntryDraft, draft: EntryDraft): Partial<EntryDraft> {
+  const out: Partial<EntryDraft> = {};
+  for (const k of Object.keys({ ...initial, ...draft }) as (keyof EntryDraft)[]) {
+    const a = initial[k] ?? undefined;
+    const b = draft[k] ?? undefined;
+    if (a !== b) (out as Record<string, unknown>)[k] = draft[k];
+  }
+  return out;
+}
+
 /** Ajusta el aviso cuando se pone o se quita la hora. */
 export function fixAlert(d: EntryDraft, prevTime: string | undefined, defaultAlert: number | null): number | null {
   const hadTime = !!prevTime;

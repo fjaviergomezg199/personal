@@ -1,6 +1,6 @@
 import { agendaForDate, areaMap, type AgendaItem } from '../store/selectors';
 import type { AppState, Area, FinScope, Goal, Habit, ISODate } from '../store/types';
-import { addDays, startOfWeek, toISODate, weekdayIndex, weekKey } from './dates';
+import { addDays, localDay, startOfWeek, toISODate, weekdayIndex, weekKey } from './dates';
 import { categoryOf, summarize } from './finance';
 import { countOn, scheduled } from './habits';
 import { occursOn } from './recurrence';
@@ -37,7 +37,6 @@ export function summaryWeekFor(today: ISODate): ISODate | null {
   return null;
 }
 
-const localDay = (iso: string) => toISODate(new Date(iso));
 const msDay = (ms: number) => toISODate(new Date(ms));
 
 export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSummary {
@@ -47,10 +46,12 @@ export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSu
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const me = s.settings.name.trim().toLowerCase();
 
-  // Lo hecho: tareas y recordatorios (los repetidos, cada día), y las tareas de casa propias
+  // Lo hecho: tareas y recordatorios (los repetidos, cada día), y las tareas de casa propias.
+  // De lo compartido, solo lo que marcó uno mismo.
+  const mine = (by: string | undefined) => !by || by.trim().toLowerCase() === me;
   const done: WeekSummary['done'] = [];
   for (const e of s.entries) {
-    if (e.kind === 'event') continue;
+    if (e.kind === 'event' || (e.shared && !mine(e.by))) continue;
     if (e.repeat !== 'none') {
       for (const d of e.doneDates ?? []) if (inWeek(d)) done.push({ key: `${e.id}:${d}`, title: e.title, date: d });
     } else if (e.done) {
@@ -59,7 +60,7 @@ export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSu
     }
   }
   for (const i of s.listItems) {
-    if (i.list !== 'casa' || !i.done || i.deleted || (i.by && i.by.trim().toLowerCase() !== me)) continue;
+    if (i.list !== 'casa' || !i.done || i.deleted || !mine(i.by)) continue;
     const d = msDay(i.updatedAt);
     if (inWeek(d)) done.push({ key: i.id, title: i.text, date: d });
   }
@@ -89,11 +90,11 @@ export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSu
 
   // Hábitos, día a día
   const habits = s.habits
-    .filter((h) => !h.archived && h.createdAt.slice(0, 10) <= end)
+    .filter((h) => !h.archived && localDay(h.createdAt) <= end)
     .sort((a, b) => a.order - b.order)
     .map((h) => {
       const log = s.habitLog[h.id];
-      const created = h.createdAt.slice(0, 10);
+      const created = localDay(h.createdAt);
       let doneN = 0;
       let due = 0;
       const marks = days.map((d): DayMark => {
@@ -150,7 +151,7 @@ export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSu
   if (perDay.size) kcal = { avg: Math.round([...perDay.values()].reduce((a, b) => a + b, 0) / perDay.size), days: perDay.size, target: s.nutritionTargets.kcal };
 
   const wk = weekKey(start);
-  const goals = s.goals.filter((g) => !g.archived && g.period === 'week' && g.createdAt.slice(0, 10) <= end).map((goal) => ({ goal, value: goal.progress[wk] ?? 0 }));
+  const goals = s.goals.filter((g) => !g.archived && g.period === 'week' && localDay(g.createdAt) <= end).map((goal) => ({ goal, value: goal.progress[wk] ?? 0 }));
 
   const bought = s.listItems.filter((i) => i.list === 'compra' && i.done && !i.deleted && inWeek(msDay(i.updatedAt))).length;
 

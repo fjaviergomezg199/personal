@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Minus, Plus, Trash2 } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
 import { confirmDialog, Empty, SectionHead, Sheet, toast } from '../components/ui';
-import { addDays, capitalize, formatShort, startOfWeek, WEEKDAY_LETTERS } from '../lib/dates';
+import { addDays, capitalize, formatShort, localDay, startOfWeek, WEEKDAY_LETTERS } from '../lib/dates';
 import { bestStreak, completion, countOn, daysLabel, doneOn, scheduled, streak } from '../lib/habits';
 import { useToday } from '../lib/useToday';
 import { deleteHabit, moveHabit, restoreHabit, saveHabit, setHabitCount, useApp } from '../store/store';
@@ -149,7 +149,7 @@ export function HabitsModule() {
 /** Las últimas semanas, un cuadro por día. */
 function HabitHistory({ h, log, today, weeks }: { h: Habit; log: Record<ISODate, number> | undefined; today: ISODate; weeks: number }) {
   const first = addDays(startOfWeek(today), -7 * (weeks - 1));
-  const created = h.createdAt.slice(0, 10);
+  const created = localDay(h.createdAt);
   const cols = Array.from({ length: weeks }, (_, w) => Array.from({ length: 7 }, (_, d) => addDays(first, w * 7 + d)));
   return (
     <div className="habit-history mt12" aria-label={`Últimas ${weeks} semanas de ${h.name}`}>

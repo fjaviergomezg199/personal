@@ -33,6 +33,12 @@ export function makeISODate(year: number, month: number, day: number): ISODate |
   return toISODate(d);
 }
 
+/** El día (en la hora de aquí) de una marca de tiempo ISO: «2026-10-20T22:30:00Z» es el 21 en Madrid. */
+export function localDay(timestamp: string): ISODate {
+  const d = new Date(timestamp);
+  return Number.isNaN(d.getTime()) ? timestamp.slice(0, 10) : toISODate(d);
+}
+
 export function todayISO(now: Date = new Date()): ISODate {
   return toISODate(now);
 }

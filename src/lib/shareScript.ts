@@ -128,6 +128,9 @@ function hojaDe_(nombre, lista) {
   if (!hoja) {
     if (libro.getSheets().length >= MAX_HOJAS) return null;
     hoja = libro.insertSheet(nombre);
+  }
+  if (!hoja.getLastColumn()) {
+    // Nueva (o vacía): se prepara con sus columnas.
     hoja.getRange('A:Z').setNumberFormat('@');
     hoja.appendRow(columnasNuevas_(nombre, lista));
     hoja.setFrozenRows(1);
@@ -150,9 +153,10 @@ function leerRegistros_(filas, desde) {
   return lista;
 }
 
+// Devuelve false si la pestaña no es de la app (entonces no se toca).
 function guardarRegistros_(hoja, lista, ahora) {
   const ancho = hoja.getLastColumn();
-  if (!ancho || !esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) return;
+  if (!ancho || !esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) return false;
   const filas = hoja.getDataRange().getValues();
   const cab = filas[0].map(String);
   // Datos nuevos de una versión nueva de la app: columnas al final.
@@ -187,15 +191,20 @@ function guardarRegistros_(hoja, lista, ahora) {
       filas[i] = valores;
     }
   }
-  if (iBorr < 0) return;
-  const limite = ahora - 30 * 86400000;
-  for (let i = filas.length - 1; i >= 1; i--) {
-    if (siNo_(filas[i][iBorr]) && (Number(filas[i][iAct]) || 0) < limite) hoja.deleteRow(i + 1);
+  if (iBorr >= 0) {
+    const limite = ahora - 30 * 86400000;
+    for (let i = filas.length - 1; i >= 1; i--) {
+      if (siNo_(filas[i][iBorr]) && (Number(filas[i][iAct]) || 0) < limite) hoja.deleteRow(i + 1);
+    }
   }
+  return true;
 }
 
-function todo_(desde) {
+// «bloqueados»: lo que no se ha podido guardar (una pestaña vuestra con ese nombre, o demasiadas pestañas).
+// La app lo guarda en el móvil y avisa; nunca lo da por borrado.
+function todo_(desde, bloqueados) {
   const registros = {};
+  const fuera = bloqueados || [];
   const hojas = SpreadsheetApp.getActiveSpreadsheet().getSheets();
   for (let h = 0; h < hojas.length; h++) {
     const hoja = hojas[h];
@@ -203,11 +212,14 @@ function todo_(desde) {
     if (nombre === HOJA || !NOMBRE.test(nombre)) continue;
     // Primero solo la cabecera: las pestañas que no son de la app no se leen enteras.
     const ancho = hoja.getLastColumn();
-    if (!ancho || !esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) continue;
+    if (!ancho) continue;
+    if (!esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) {
+      if (REGISTROS[nombre] && fuera.indexOf(nombre) < 0) fuera.push(nombre);
+      continue;
+    }
     registros[nombre] = leerRegistros_(hoja.getDataRange().getValues(), desde);
   }
-  for (const nombre in REGISTROS) if (!registros[nombre]) registros[nombre] = [];
-  return { ok: true, version: VERSION, items: leer_(hoja_()), registros: registros, ahora: Date.now() };
+  return { ok: true, version: VERSION, items: leer_(hoja_()), registros: registros, bloqueados: fuera, ahora: Date.now() };
 }
 
 function respuesta_(datos) {
@@ -239,13 +251,14 @@ function doPost(e) {
     const ahora = Date.now();
     guardarLista_(cuerpo.cambios || []);
     const registros = cuerpo.registros || {};
+    const fuera = [];
     for (const nombre in registros) {
       const lista = registros[nombre];
-      if (nombre === HOJA || !NOMBRE.test(nombre) || !Array.isArray(lista) || !lista.length) continue;
-      const hoja = hojaDe_(nombre, lista);
-      if (hoja) guardarRegistros_(hoja, lista, ahora);
+      if (!Array.isArray(lista) || !lista.length) continue;
+      const hoja = nombre !== HOJA && NOMBRE.test(nombre) ? hojaDe_(nombre, lista) : null;
+      if (!hoja || !guardarRegistros_(hoja, lista, ahora)) fuera.push(nombre);
     }
-    return respuesta_(todo_(Number(cuerpo.desde) || 0));
+    return respuesta_(todo_(Number(cuerpo.desde) || 0, fuera));
   } finally {
     cerrojo.releaseLock();
   }

@@ -1,5 +1,5 @@
 import type { Habit, ISODate } from '../store/types';
-import { addDays, weekdayIndex } from './dates';
+import { addDays, localDay, weekdayIndex } from './dates';
 
 /** ¿Toca ese día? */
 export const scheduled = (h: Habit, date: ISODate) => !h.days.length || h.days.includes(weekdayIndex(date));
@@ -16,7 +16,7 @@ export function streak(h: Habit, log: Record<ISODate, number> | undefined, today
   let n = 0;
   let d = today;
   if (scheduled(h, d) && !doneOn(h, log, d)) d = addDays(d, -1);
-  const created = h.createdAt.slice(0, 10);
+  const created = localDay(h.createdAt);
   for (let k = 0; k < 3660; k++, d = addDays(d, -1)) {
     if (!scheduled(h, d)) {
       if (d < created) break;
@@ -46,7 +46,8 @@ export function bestStreak(h: Habit, log: Record<ISODate, number> | undefined, t
 export function completion(h: Habit, log: Record<ISODate, number> | undefined, from: ISODate, to: ISODate): { done: number; due: number } {
   let done = 0;
   let due = 0;
-  const start = h.createdAt.slice(0, 10) > from ? h.createdAt.slice(0, 10) : from;
+  const created = localDay(h.createdAt);
+  const start = created > from ? created : from;
   for (let d = start; d <= to; d = addDays(d, 1)) {
     if (!scheduled(h, d)) continue;
     due++;

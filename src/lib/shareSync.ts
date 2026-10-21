@@ -66,11 +66,13 @@ export interface ServerData {
   version: number;
   /** Hora de la hoja (para pedir la próxima vez solo lo nuevo). */
   ahora?: number;
+  /** Pestañas que la hoja no ha podido usar (una vuestra con el mismo nombre…). */
+  bloqueados?: string[];
 }
 
 async function readResponse(res: Response): Promise<ServerData> {
   const text = await res.text();
-  let data: { ok?: boolean; error?: string; items?: ListItem[]; registros?: SharedRecords; version?: number; ahora?: number };
+  let data: { ok?: boolean; error?: string; items?: ListItem[]; registros?: SharedRecords; version?: number; ahora?: number; bloqueados?: string[] };
   try {
     data = JSON.parse(text);
   } catch {
@@ -90,7 +92,13 @@ async function readResponse(res: Response): Promise<ServerData> {
     by: i.by || undefined,
     deleted: !!i.deleted,
   }));
-  return { items, registros: data.registros, version: Number(data.version) || 2, ahora: Number(data.ahora) || undefined };
+  return {
+    items,
+    registros: data.registros,
+    version: Number(data.version) || 2,
+    ahora: Number(data.ahora) || undefined,
+    bloqueados: Array.isArray(data.bloqueados) ? data.bloqueados.map(String) : undefined,
+  };
 }
 
 async function call(
@@ -182,6 +190,17 @@ export async function syncOnce(local: LocalLists, share: Pick<ShareConfig, 'url'
 
 /* ---------- Sincronización de la app ---------- */
 
+const WHAT: Record<string, string> = { Planes: 'los planes en pareja', Movimientos: 'la cuenta conjunta', Fijos: 'la cuenta conjunta', Cuenta: 'la cuenta conjunta' };
+
+/** Aviso si la hoja no ha podido usar alguna pestaña (lo de esa pestaña sigue guardado en el móvil). */
+export function blockedNotice(names: string[] | undefined): string | undefined {
+  if (!names?.length) return undefined;
+  const tabs = names.map((n) => `«${n}»`);
+  const list = tabs.length === 1 ? tabs[0] : `${tabs.slice(0, -1).join(', ')} y ${tabs.at(-1)}`;
+  const what = [...new Set(names.map((n) => WHAT[n] ?? 'todo'))].join(' y ');
+  return `Cambia el nombre de ${tabs.length === 1 ? 'la pestaña' : 'las pestañas'} ${list} de vuestra hoja de Google (la app ${tabs.length === 1 ? 'la' : 'las'} necesita para compartir ${what}). Mientras, se guarda en el móvil.`;
+}
+
 let syncing = false;
 let again = false;
 const listeners = new Set<() => void>();
@@ -233,7 +252,7 @@ export async function syncShare(): Promise<void> {
         const finOk = server.version >= 3 && !!server.registros;
         applySyncResult(r.items, r.pending, {
           lastSync: Date.now(),
-          error: undefined,
+          error: blockedNotice(server.bloqueados),
           scriptVersion: server.version,
           ...(finOk && server.ahora ? { since: server.ahora } : {}),
         });
@@ -246,7 +265,7 @@ export async function syncShare(): Promise<void> {
           const merged = mergePlans(
             { entries: st.entries, pending: st.planPending, gone: st.planGone },
             plans.sent,
-            server.registros.Planes ?? [],
+            server.registros.Planes,
             full,
             st.settings.defaultAlert,
           );

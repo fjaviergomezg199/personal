@@ -121,6 +121,21 @@ describe('cuenta conjunta compartida', () => {
     expect(b.movements[0]).toMatchObject({ note: '+34 600 000 000', recurringId: 'F1' });
   });
 
+  it('si la hoja tiene una pestaña «Movimientos» vuestra, lo de la cuenta conjunta no se borra', async () => {
+    const g = fakeGoogle();
+    g.sheets.Movimientos = [['Fecha', 'Concepto', 'Importe'], ['1/10', 'Mío', '3']];
+    const a = emptyFinance();
+    a.movements.push(mov({}), mov({ id: 'M0', note: 'Ya enviado' }));
+    a.recurring.push(fixed({}));
+    a.pending = ['m:M1', 'f:F1'];
+    const r = await sync(g, a);
+    expect(r.server.bloqueados).toEqual(['Movimientos']);
+    expect(r.fin.movements.map((m) => m.id)).toEqual(['M1', 'M0']);
+    // Los fijos sí se guardaron; los movimientos esperan (también el que ya se había enviado)
+    expect(r.fin.pending.sort()).toEqual(['m:M0', 'm:M1']);
+    expect(g.sheets.Movimientos).toHaveLength(2);
+  });
+
   it('con el código antiguo de la hoja, la cuenta conjunta se queda pendiente', async () => {
     const old = async () => Response.json({ ok: true, items: [], ahora: 1 });
     const r = await exchange({ url: 'u', key: 'k' }, [], { Movimientos: [{ id: 'M1' }] }, 0, old);

@@ -30,7 +30,7 @@ const phone = (entries: Entry[] = [], pending: string[] = []): Phone => ({ entri
 async function sync(g: ReturnType<typeof fakeGoogle>, p: Phone, full = true): Promise<Phone> {
   const out = planOutbox(p, 'yo');
   const server = await exchange(g.share, [], out.rows.length ? { Planes: out.rows } : {}, 0, g.fetchImpl);
-  const m = mergePlans(p, out.sent, server.registros!.Planes ?? [], full, 15);
+  const m = mergePlans(p, out.sent, server.registros!.Planes, full, 15);
   return { entries: m.entries, pending: m.pending, gone: m.gone, googleDeletes: [...p.googleDeletes, ...m.googleDeletes] };
 }
 
@@ -71,6 +71,15 @@ describe('planes en pareja', () => {
     expect(leyre.entries[0]).toMatchObject({ time: '22:00', location: 'La Tagliatella', by: 'Javi', alert: 60, areaId: 'ocio', dirty: true });
     expect(leyre.entries[0].google).toEqual({ id: 'gLeyre', calendarId: 'primary' });
     expect(javi.entries[0]).toMatchObject({ alert: 1440, areaId: 'casa' });
+  });
+
+  it('si pasa a tener hora y quien lo cambia no quiere aviso, tampoco lo pone aquí', async () => {
+    const g = fakeGoogle();
+    await sync(g, phone([plan({ time: undefined, alert: null })], ['E1']));
+    let javi = await sync(g, phone());
+    await sync(g, phone([plan({ time: '20:00', alert: null, updatedAt: at(9) })], ['E1']));
+    javi = await sync(g, javi);
+    expect(javi.entries[0]).toMatchObject({ time: '20:00', alert: null });
   });
 
   it('si deja de tener hora, el aviso se ajusta', async () => {
@@ -174,6 +183,18 @@ describe('planes en pareja', () => {
     // Pidiendo solo lo nuevo no se puede saber: no se quita nada
     const inc = await sync(g, phone([plan({ id: 'Old' })]), false);
     expect(inc.entries.map((e) => e.id)).toEqual(['Old', 'New']);
+  });
+
+  it('si la hoja no tiene (o no puede usar) la pestaña de planes, nada se borra y se vuelve a enviar', async () => {
+    const g = fakeGoogle();
+    g.sheets.Planes = [['Qué', 'Cuándo'], ['Vacaciones', 'agosto']];
+    const p = phone([plan({ google: { id: 'gLeyre', calendarId: 'primary' } }), plan({ id: 'Old', title: 'Ya enviado' })], ['E1']);
+    p.gone = [{ id: 'Gone', at: 5 }];
+    const r = await sync(g, { ...p, pending: ['E1', 'Gone'] });
+    expect(r.entries.map((e) => e.id)).toEqual(['E1', 'Old']);
+    expect(r.googleDeletes).toEqual([]);
+    expect(r.pending.sort()).toEqual(['E1', 'Gone', 'Old']);
+    expect(r.gone).toEqual([{ id: 'Gone', at: 5 }]);
   });
 
   it('textos que parecen fórmulas llegan tal cual', async () => {

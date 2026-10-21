@@ -1,6 +1,6 @@
 import type { SheetRequest } from '../components/sheets';
 import type { AppState, ISODate } from '../store/types';
-import { formatDayMonth } from './dates';
+import { formatDayMonth, localDay } from './dates';
 import { categoryOf, eur } from './finance';
 import { fold } from './quickParse';
 
@@ -121,7 +121,7 @@ export function searchAll(s: AppState, query: string, today: ISODate): HitGroup[
         emoji: d.type === 'pdf' ? '📄' : d.type === 'link' ? '🔗' : d.type === 'image' ? '🖼️' : '📎',
         title: d.title,
         detail: [areas.get(d.areaId)?.name, d.text && has(d.text) ? snippet(d.text, query) : undefined].filter(Boolean).join(' · '),
-        date: d.createdAt.slice(0, 10),
+        date: localDay(d.createdAt),
         go: { path: `/areas/${d.areaId}?bloque=docs` },
       })),
   );

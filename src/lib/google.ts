@@ -13,6 +13,8 @@ export const GOOGLE_SCOPES = [
 /** Solo los archivos que crea la app (la carpeta de copias), no el resto del Drive. */
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_KEY = 'diaadia:gtoken';
+/** Permisos que la persona ha dado alguna vez (el token caduca; esto no). */
+const GRANTED_KEY = 'diaadia:gscopes';
 const PENDING_KEY = 'diaadia:gauth';
 const AUTO_KEY = 'diaadia:gauto';
 
@@ -72,6 +74,15 @@ export function hasScope(scope: string): boolean {
   return !!t && (t.scopes ?? GOOGLE_SCOPES).includes(scope);
 }
 
+/** ¿Lo concedió alguna vez? (para renovar el permiso sin pantallas solo con lo ya aceptado). */
+export function scopeGranted(scope: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem(GRANTED_KEY) ?? '[]') as string[]).includes(scope);
+  } catch {
+    return false;
+  }
+}
+
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
@@ -128,6 +139,7 @@ export function consumeGoogleRedirect(): RedirectResult | null {
   const scopes = (params.get('scope') ?? '').split(/\s+/).filter(Boolean);
   const stored: StoredToken = { token, expiresAt: Date.now() + (expiresIn - 120) * 1000, ...(scopes.length ? { scopes } : {}) };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(stored));
+  if (scopes.length) localStorage.setItem(GRANTED_KEY, JSON.stringify(scopes));
   return { status: 'ok', then: pending.then };
 }
 

@@ -134,15 +134,22 @@ function versionNow(s: PlanState, id: ID): number | undefined {
 /**
  * Une lo que dice la hoja con la agenda de este móvil. Lo pendiente y más nuevo
  * de aquí se respeta. Con `full` la hoja trae todo: un plan compartido que no
- * venga (y no esté pendiente) es que ya no existe.
+ * venga (y no esté pendiente) es que ya no existe. Sin `rows` (la hoja no tiene la
+ * pestaña de planes o no ha podido usarla), todo se queda y se vuelve a enviar.
  */
 export function mergePlans(
   cur: PlanState,
   sent: Map<ID, number>,
-  rows: Row[],
+  rows: Row[] | undefined,
   full: boolean,
   defaultAlert: number | null,
 ): PlanState & { googleDeletes: GoogleLink[]; changed: boolean } {
+  if (!rows) {
+    const again = new Set(cur.pending.filter((id) => sent.get(id) !== -1));
+    for (const e of cur.entries) if (e.shared) again.add(e.id);
+    for (const g of cur.gone) again.add(g.id);
+    return { entries: cur.entries, pending: [...again], gone: cur.gone, googleDeletes: [], changed: false };
+  }
   // Lo enviado que no ha vuelto a cambiar aquí ya está en la hoja.
   const pending = new Set(cur.pending.filter((id) => !(sent.has(id) && (sent.get(id) === -1 || versionNow(cur, id) === sent.get(id)))));
   const gone = new Map(cur.gone.map((g) => [g.id, g.at]));
@@ -189,7 +196,10 @@ export function mergePlans(
       const next: Entry = { ...local, ...fields, by, updatedAt: iso(v) };
       if (sameShared(local, next)) continue;
       // Cada uno conserva su aviso, salvo que el plan pase a tener hora (o deje de tenerla).
-      if (!!local.time !== !!next.time) next.alert = rowAlert(r) ?? defaultAlertFor(fields, defaultAlert);
+      if (!!local.time !== !!next.time) {
+        const alert = rowAlert(r);
+        next.alert = alert === undefined ? defaultAlertFor(fields, defaultAlert) : alert;
+      }
       next.dirty = true;
       out.set(r.id, next);
       changed = true;

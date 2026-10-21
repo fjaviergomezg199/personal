@@ -115,6 +115,19 @@ describe('resumen de la semana', () => {
   });
 });
 
+describe('lo compartido', () => {
+  it('de las tareas en pareja, solo cuenta lo que marcó uno mismo', () => {
+    const s = state();
+    s.entries.push(
+      entry({ title: 'Comprar el regalo de mamá', shared: true, by: 'Javi', done: true, doneAt: at('2026-10-21') }),
+      entry({ title: 'Reservar la casa rural', shared: true, by: 'Leyre', done: true, doneAt: at('2026-10-22') }),
+    );
+    const titles = weekSummary(s, MON, '2026-10-25').done.map((d) => d.title);
+    expect(titles).toContain('Reservar la casa rural');
+    expect(titles).not.toContain('Comprar el regalo de mamá');
+  });
+});
+
 describe('gastos de la semana', () => {
   it('las categorías que ya no existen se juntan en «Otros»', () => {
     const s = state();

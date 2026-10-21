@@ -121,6 +121,8 @@ La lista de la compra, las tareas de casa, la **cuenta conjunta** y los **planes
 
 Cada móvil se actualiza al abrir la app, al volver a ella y cada 30 segundos mientras está abierta; sin conexión se apunta igual y se envía al volver internet. Si los dos cambiáis lo mismo a la vez, gana el último cambio.
 
+La app usa en la hoja las pestañas «Lista», «Movimientos», «Fijos», «Cuenta» y «Planes». Podéis añadir otras vuestras sin problema; si ya teníais una con alguno de esos nombres, la app no la toca y avisa para que le cambiéis el nombre (mientras, lo de esa pestaña se queda guardado en el móvil).
+
 **Si configurasteis la hoja con una versión anterior** (código «versión 2» o «versión 3»), lo que ya compartíais sigue funcionando, pero para compartir los planes en pareja (y la cuenta conjunta, si era la 2) hay que poner el código nuevo, la **versión 4**: *Ajustes → Código para tu pareja y opciones → Actualiza el código de la hoja*. Se pega en Apps Script y se hace *Implementar → Gestionar implementaciones → ✏️ → Nueva versión*; la dirección `/exec` no cambia, así que no hay que tocar nada en los móviles. Lo que apuntéis mientras tanto como «en pareja» se envía solo en cuanto esté puesto. La versión 4 guarda también cualquier cosa nueva que la app comparta en el futuro, así que **no habrá que volver a cambiarlo**.
 
 ### 4. Conectar Google Calendar (opcional, recomendado)

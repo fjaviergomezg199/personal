@@ -11,7 +11,7 @@ import { rrule } from '../lib/sync';
 import { partnerName } from '../store/selectors';
 import { deleteEntry, restoreEntry, toggleEntryDone, updateEntry, useApp } from '../store/store';
 import type { Entry, ID, ISODate } from '../store/types';
-import { EntryFields, type EntryDraft } from './EntryForm';
+import { changedFields, EntryFields, type EntryDraft } from './EntryForm';
 
 const KIND_TITLE: Record<Entry['kind'], string> = { reminder: 'Recordatorio', event: 'Plan', task: 'Tarea' };
 
@@ -33,7 +33,8 @@ export function entryShareText(e: Entry): string {
 export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void }) {
   const state = useApp();
   const entry = state.entries.find((e) => e.id === props.id);
-  const [draft, setDraft] = useState<EntryDraft | null>(() => (entry ? toDraft(entry) : null));
+  const [initial] = useState<EntryDraft | null>(() => (entry ? toDraft(entry) : null));
+  const [draft, setDraft] = useState<EntryDraft | null>(initial);
   if (!entry || !draft) {
     return (
       <Sheet open onClose={props.onClose} title="No encontrado">
@@ -49,8 +50,11 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
 
   const save = () => {
     if (!draft.title.trim()) return;
-    updateEntry(entry.id, { ...draft, title: draft.title.trim() });
-    toast('Cambios guardados');
+    const patch = changedFields(initial ?? toDraft(entry), { ...draft, title: draft.title.trim() });
+    if (Object.keys(patch).length) {
+      updateEntry(entry.id, patch);
+      toast('Cambios guardados');
+    }
     props.onClose();
   };
 

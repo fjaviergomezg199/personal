@@ -779,3 +779,29 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .week-habits .wh-count { font-size: calc(13px * var(--fs)); font-variant-numeric: tabular-nums; text-align: right; min-width: 2.6em; }
 .fin-stats.week-tiles { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); }
 .week-legend { --tone: var(--text-2); }
+
+/* ---------- Día a vista en lista (ahora y después) ---------- */
+.dv-nowline { position: relative; height: 26px; display: flex; align-items: center; padding-left: 46px; }
+.dv-nowline::before { content: ''; position: absolute; left: 16px; right: 16px; top: 50%; height: 2px; background: var(--danger); }
+.dv-nowline::after { content: ''; position: absolute; left: 12px; top: calc(50% - 4px); width: 10px; height: 10px; border-radius: 99px; background: var(--danger); }
+.dv-nowline span { position: relative; background: var(--bg-elev); padding: 0 8px; font-size: calc(12px * var(--fs)); font-weight: 750; color: var(--danger); font-variant-numeric: tabular-nums; }
+.dv-gone { width: 100%; border: 0; background: none; text-align: left; }
+.dv-gone .lead { color: var(--success); font-weight: 800; }
+
+/* ---------- Tarjetas pequeñas de Hoy ---------- */
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.tile { background: var(--bg-elev); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px 13px; display: flex; flex-direction: column; gap: 4px; min-width: 0; cursor: pointer; }
+.tile-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: calc(13px * var(--fs)); font-weight: 650; color: var(--text-2); min-height: 28px; }
+.tile-head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-add { width: 30px; height: 30px; margin: -4px -6px -4px 0; border: 0; border-radius: 99px; background: var(--tone-soft, var(--primary-soft)); color: var(--tone, var(--primary)); display: grid; place-items: center; flex-shrink: 0; cursor: pointer; }
+.tile-value { font-size: calc(22px * var(--fs)); font-weight: 750; letter-spacing: -0.01em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.tile-value small { font-size: calc(13.5px * var(--fs)); font-weight: 650; color: var(--text-2); letter-spacing: 0; }
+.tile .meter { height: 6px; margin-top: 2px; }
+.tile-sub { font-size: calc(12.5px * var(--fs)); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Menú en Hoy: la comida que toca, con «Comido» */
+.meal.meal-today { display: block; }
+.meal-today .mt-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; margin-bottom: 2px; }
+.meal-today .x { font-size: calc(15px * var(--fs)); }
+.overdue-line { gap: 12px; padding: 12px 14px; }

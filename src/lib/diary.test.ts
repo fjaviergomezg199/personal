@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FoodLogItem } from '../store/types';
-import { mealForNow, mealsForDay, menuHasAlternatives, menuOptions, recentFoods, stripQuantity } from './diary';
+import { mealForNow, mealsForDay, menuHasAlternatives, menuMealItems, menuOptions, recentFoods, stripQuantity } from './diary';
 
 const at = (h: number, m = 0) => new Date(2026, 9, 21, h, m);
 
@@ -54,5 +54,20 @@ describe('diario de comidas', () => {
     ]);
     // El que ya no existe se reconstruye por 100 g
     expect(r[0].food).toMatchObject({ kcal: 200, protein: 10, carbs: 20, fat: 8 });
+  });
+});
+
+describe('apuntar del menú de un toque', () => {
+  it('una comida normal se apunta entera; con opciones o algo desconocido, hay que abrir la hoja', () => {
+    const items = menuMealItems('150 g de pechuga de pollo con 80 g de arroz\nEnsalada de tomate y lechuga con 1 cucharada de aceite de oliva', []);
+    expect(items?.map((i) => [i.food.key, Math.round(i.grams)])).toEqual([
+      ['pollo', 150],
+      ['arroz', 80],
+      ['tomate', 120],
+      ['lechuga', 80],
+      ['aceite-oliva', 10],
+    ]);
+    expect(menuMealItems('Opción 1: tortilla de 2 huevos\nOpción 2: 100 g de pavo', [])).toBeNull();
+    expect(menuMealItems('Batido de la abuela Pura', [])).toBeNull();
   });
 });

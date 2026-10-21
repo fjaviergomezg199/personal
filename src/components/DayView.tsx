@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { ChevronLeft, ChevronRight, Clock, List, Plus } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { addDays, capitalize, daysBetween, formatLong, makeHHMM } from '../lib/dates';
 import { agendaForDate, areaMap, type AgendaItem } from '../store/selectors';
-import { useApp } from '../store/store';
+import { updateSettings, useApp } from '../store/store';
 import type { AreaColor } from '../store/types';
 import { AgendaRow, entryEmoji } from './AgendaRow';
 import { openSheet } from './sheets';
@@ -72,6 +72,82 @@ function blockFor(item: AgendaItem): Omit<Block, 'col' | 'cols'> | null {
   }
 }
 
+const titleOf = (i: AgendaItem) =>
+  i.kind === 'entry' ? i.entry.title : i.kind === 'plan' ? i.item.title : i.kind === 'google' ? i.event.title : i.birthday.name;
+
+/**
+ * Lista «ahora y después»: lo que ya terminó (planes, o tareas hechas) se recoge
+ * en una línea; lo pendiente se queda a la vista aunque su hora haya pasado.
+ * `nowAt` es dónde va la línea de «ahora» (-1 si no es hoy).
+ */
+export function dayTimeline(timed: AgendaItem[], now: number | null): { gone: AgendaItem[]; rest: AgendaItem[]; nowAt: number } {
+  const gone: AgendaItem[] = [];
+  const rest: AgendaItem[] = [];
+  for (const i of timed) {
+    const b = blockFor(i);
+    const open = ((i.kind === 'entry' && i.entry.kind !== 'event') || i.kind === 'plan') && !i.done;
+    if (now !== null && b && b.end <= now && !open) gone.push(i);
+    else rest.push(i);
+  }
+  if (now === null) return { gone, rest, nowAt: -1 };
+  const at = rest.findIndex((i) => !!i.time && toMin(i.time) >= now);
+  return { gone, rest, nowAt: at === -1 ? rest.length : at };
+}
+
+function NowLine({ now }: { now: number }) {
+  return (
+    <div className="dv-nowline" role="separator" aria-label="Ahora">
+      <span>
+        Ahora · {String(Math.floor(now / 60)).padStart(2, '0')}:{String(now % 60).padStart(2, '0')}
+      </span>
+    </div>
+  );
+}
+
+const LIST_MAX = 7;
+
+function DayList({ timed, now }: { timed: AgendaItem[]; now: number | null }) {
+  const [showGone, setShowGone] = useState(false);
+  const [all, setAll] = useState(false);
+  const { gone, rest, nowAt } = dayTimeline(timed, now);
+  const shown = all ? rest : rest.slice(0, LIST_MAX);
+  return (
+    <div className="list mt12">
+      {gone.length > 0 &&
+        (showGone ? (
+          gone.map((i) => <AgendaRow key={i.key} item={i} />)
+        ) : (
+          <button className="row tappable dv-gone" onClick={() => setShowGone(true)} aria-label={`Ver lo que ya pasó (${gone.length})`}>
+            <div className="lead" aria-hidden>
+              ✓
+            </div>
+            <div className="body">
+              <div className="meta ellipsis" style={{ display: 'block' }}>
+                Ya pasó: {gone.map(titleOf).join(' · ')}
+              </div>
+            </div>
+          </button>
+        ))}
+      {shown.map((i, k) => (
+        <Fragment key={i.key}>
+          {k === nowAt && now !== null && <NowLine now={now} />}
+          <AgendaRow item={i} />
+        </Fragment>
+      ))}
+      {now !== null && nowAt >= shown.length && nowAt === rest.length && <NowLine now={now} />}
+      {rest.length > shown.length && (
+        <button className="row tappable no-lead" onClick={() => setAll(true)}>
+          <div className="body">
+            <span className="link-btn" style={{ padding: 0 }}>
+              Ver {rest.length - shown.length} más
+            </span>
+          </div>
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Reparte en columnas los bloques que se solapan. */
 export function layoutBlocks(raw: Omit<Block, 'col' | 'cols'>[]): Block[] {
   const sorted = [...raw].sort((a, b) => a.start - b.start || b.end - a.end);
@@ -119,6 +195,7 @@ export function DayView({ date, today, onDateChange }: { date: string; today: st
   const areas = useMemo(() => areaMap(state), [state]);
   const items = useMemo(() => agendaForDate(state, date, areas), [state, date, areas]);
   const diff = daysBetween(today, date);
+  const mode = state.settings.dayView ?? 'list';
 
   const allDay = items.filter((i) => i.kind === 'birthday' || (!i.time && (i.kind === 'google' || (i.kind === 'entry' && i.entry.kind === 'event'))));
   const todo = items.filter((i) => !i.time && ((i.kind === 'entry' && i.entry.kind !== 'event') || i.kind === 'plan'));
@@ -163,11 +240,19 @@ export function DayView({ date, today, onDateChange }: { date: string; today: st
         <button className="icon-btn small plain" aria-label="Día siguiente" onClick={() => onDateChange(addDays(date, 1))}>
           <ChevronRight size={20} />
         </button>
+        <button
+          className="icon-btn small plain"
+          aria-label={mode === 'list' ? 'Ver el día por horas' : 'Ver el día en lista'}
+          title={mode === 'list' ? 'Por horas' : 'En lista'}
+          onClick={() => updateSettings({ dayView: mode === 'list' ? 'hours' : 'list' })}
+        >
+          {mode === 'list' ? <Clock size={18} /> : <List size={18} />}
+        </button>
       </div>
 
       <div className="dv-head">
         <div>
-          <div className="dv-date">{capitalize(formatLong(date))}</div>
+          {diff !== 0 && <div className="dv-date">{capitalize(formatLong(date))}</div>}
           <div className="small muted">
             {items.length === 0
               ? 'Día libre'
@@ -213,7 +298,9 @@ export function DayView({ date, today, onDateChange }: { date: string; today: st
         </div>
       )}
 
-      {blocks.length > 0 || (diff === 0 && items.length > 0) ? (
+      {mode === 'list' ? (
+        blocks.length > 0 && <DayList timed={blocks.map((b) => b.item)} now={diff === 0 ? now : null} />
+      ) : blocks.length > 0 || (diff === 0 && items.length > 0) ? (
         <div
           className="dv-grid mt12"
           style={{ height }}
@@ -266,7 +353,7 @@ export function DayView({ date, today, onDateChange }: { date: string; today: st
           <Empty
             emoji={diff === 0 ? '🌤️' : '🗓️'}
             title={diff === 0 ? 'Nada apuntado para hoy' : `Nada apuntado para ${dayLabel.toLowerCase()}`}
-            text={diff === 0 ? 'Toca una hora para añadir algo, o usa el botón +.' : undefined}
+            text={diff === 0 ? (mode === 'hours' ? 'Toca una hora para añadir algo, o usa el botón +.' : 'Usa el botón + o escribe arriba lo que quieras apuntar.') : undefined}
             action={
               <button className="btn small" onClick={() => openSheet({ type: 'quick', date })}>
                 <Plus size={16} /> Añadir
@@ -275,7 +362,7 @@ export function DayView({ date, today, onDateChange }: { date: string; today: st
           />
         </div>
       )}
-      {(blocks.length > 0 || (diff === 0 && items.length > 0)) && <p className="hint center">Toca una hora libre para apuntar algo a esa hora.</p>}
+      {mode === 'hours' && (blocks.length > 0 || (diff === 0 && items.length > 0)) && <p className="hint center">Toca una hora libre para apuntar algo a esa hora.</p>}
     </div>
   );
 }

@@ -410,6 +410,8 @@ export interface Settings {
   emoji?: string;
   /** Orden y visibilidad de los bloques de Hoy. */
   todayLayout?: { key: TodaySection; hidden?: boolean }[];
+  /** «Día a vista» en lista (ahora y después) o por horas. */
+  dayView?: 'list' | 'hours';
   /** Semana (su lunes) cuyo resumen ya se cerró en Hoy. */
   weekCardClosed?: ISODate;
   /** Aviso por defecto para elementos con hora (minutos). */

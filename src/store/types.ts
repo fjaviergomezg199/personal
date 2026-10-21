@@ -70,8 +70,10 @@ export type ModuleKey =
   | 'shopping'
   | 'chores'
   | 'diary'
-  | 'metrics';
-export type TemplateKey = 'studies' | 'running' | 'gym' | 'nutrition' | 'work' | 'home' | 'custom';
+  | 'metrics'
+  | 'money'
+  | 'jointMoney';
+export type TemplateKey = 'studies' | 'running' | 'gym' | 'nutrition' | 'work' | 'home' | 'money' | 'custom';
 export type AreaColor = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
 
 export interface Lift {
@@ -184,6 +186,10 @@ export interface ShareConfig {
   name: string;
   lastSync?: number;
   error?: string;
+  /** Hora de la hoja en la última sincronización (para pedir solo lo nuevo). */
+  since?: number;
+  /** Versión del código de la hoja (la 2 no comparte las finanzas). */
+  scriptVersion?: number;
 }
 
 /* ---------- Nutrición ---------- */
@@ -242,6 +248,74 @@ export interface MetricEntry {
   note?: string;
 }
 
+/* ---------- Finanzas ---------- */
+
+/** «personal»: solo en este móvil. «hogar»: la cuenta conjunta, compartida entre los dos. */
+export type FinScope = 'personal' | 'hogar';
+export type FinKind = 'gasto' | 'ingreso';
+
+export interface Movement {
+  id: ID;
+  scope: FinScope;
+  kind: FinKind;
+  date: ISODate;
+  /** En euros, siempre positivo (el tipo dice si entra o sale). */
+  amount: number;
+  category: string;
+  note?: string;
+  /** Si es el cargo real de un fijo (para ese mes sustituye al previsto). */
+  recurringId?: ID;
+  updatedAt: number;
+  by?: string;
+  deleted?: boolean;
+}
+
+export type Cadence = 1 | 2 | 3 | 6 | 12;
+
+/** Gastos o ingresos fijos: hipoteca, luz, nómina… */
+export interface Recurring {
+  id: ID;
+  scope: FinScope;
+  kind: FinKind;
+  name: string;
+  amount: number;
+  category: string;
+  /** Día del mes en que se carga (1-31; si el mes es más corto, el último). */
+  day: number;
+  /** Cada cuántos meses. */
+  every: Cadence;
+  /** Desde cuándo cuenta (y mes de referencia si no es mensual). */
+  from: ISODate;
+  /** Meses ('AAAA-MM') en los que no se carga. */
+  skips?: string[];
+  active: boolean;
+  updatedAt: number;
+  by?: string;
+  deleted?: boolean;
+}
+
+export interface FinAccount {
+  /** Primer día de cada periodo: el día que se cobra, no el 1 de cada mes. */
+  periodStarts: ISODate[];
+  /** Día de cobro habitual (para avisar de que toca empezar el periodo nuevo). */
+  payday?: number;
+  /** Tope de gasto por categoría en cada periodo. */
+  budgets: Record<string, number>;
+  budgetTotal?: number;
+  /** Saldo de la cuenta en una fecha (para prever cómo se llega al final del periodo). */
+  balance?: { amount: number; date: ISODate };
+  /** Último cambio de cada parte (para compartir la cuenta conjunta). */
+  stamps: { periods?: number; budgets?: number; balance?: number };
+}
+
+export interface FinanceState {
+  movements: Movement[];
+  recurring: Recurring[];
+  accounts: Record<FinScope, FinAccount>;
+  /** Cambios de la cuenta conjunta aún no enviados: 'm:<id>', 'f:<id>', 'c:periods'… */
+  pending: string[];
+}
+
 export interface GoogleEvent {
   id: string;
   calendarId: string;
@@ -290,7 +364,7 @@ export interface Settings {
 }
 
 export interface AppState {
-  version: 2;
+  version: 3;
   settings: Settings;
   entries: Entry[];
   birthdays: Birthday[];
@@ -313,4 +387,5 @@ export interface AppState {
   nutritionTargets: NutritionTargets;
   metricTypes: MetricType[];
   metrics: MetricEntry[];
+  finance: FinanceState;
 }

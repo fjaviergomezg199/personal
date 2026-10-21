@@ -13,7 +13,7 @@ interface Pick {
   name: string;
 }
 
-const STARTERS: TemplateKey[] = ['studies', 'running', 'gym', 'nutrition', 'work', 'home'];
+const STARTERS: TemplateKey[] = ['studies', 'running', 'gym', 'nutrition', 'work', 'home', 'money'];
 
 export function Onboarding() {
   const [step, setStep] = useState(0);

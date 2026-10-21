@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '../components/ui';
 import { todayISO } from '../lib/dates';
+import { currentPeriod, daysLeft, eurInt, summarizePeriod } from '../lib/finance';
 import { sumMacros } from '../lib/foods';
 import { fmt0, fmtFixed } from '../lib/num';
 import { clearQuery, navigate, useRoute } from '../lib/router';
@@ -29,6 +30,15 @@ function areaSummary(s: AppState, a: Area, today: string): string {
   if (a.modules.includes('diary')) {
     const kcal = sumMacros(s.foodLog.filter((l) => l.date === today)).kcal;
     if (kcal) return `🔥 ${fmt0(kcal)}${s.nutritionTargets.kcal ? ` / ${fmt0(s.nutritionTargets.kcal)}` : ''} kcal hoy`;
+  }
+  if (a.modules.includes('money')) {
+    const acc = s.finance.accounts.personal;
+    const p = currentPeriod(acc, today);
+    const spent = summarizePeriod(s.finance, 'personal', p, today).spent;
+    if (spent || acc.periodStarts.length) {
+      const left = daysLeft(p, today);
+      return `💶 ${eurInt(spent)} este periodo${left ? ` · quedan ${left} días` : ''}`;
+    }
   }
   if (a.modules.includes('menu') && a.menu) {
     const meals = todaysMenu(a, today);

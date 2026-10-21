@@ -51,7 +51,7 @@ export function HomeShareSheet({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            La lista de la compra y las tareas de casa se guardan en una hoja de cálculo de Google vuestra, y los dos móviles la usan. Lo configura{' '}
+            La lista de la compra, las tareas de casa y la cuenta conjunta se guardan en una hoja de cálculo de Google vuestra, y los dos móviles la usan. Lo configura{' '}
             <b>uno de los dos</b> (mejor desde el ordenador) y el otro se une con un código.
           </p>
           <Segmented
@@ -227,6 +227,8 @@ function Manage({ share, onClose }: { share: ShareConfig; onClose: () => void })
         </div>
         <p className="hint">Cualquiera con este código puede ver y cambiar la lista: compártelo solo con tu pareja.</p>
       </div>
+      <ScriptUpdate share={share} />
+
       <button
         className="link-btn mt16"
         style={{ color: 'var(--danger)' }}
@@ -245,6 +247,52 @@ function Manage({ share, onClose }: { share: ShareConfig; onClose: () => void })
       >
         Dejar de compartir en este móvil
       </button>
+    </div>
+  );
+}
+
+/** Para pasar a una versión nueva del código de la hoja (la dirección no cambia). */
+function ScriptUpdate({ share }: { share: ShareConfig }) {
+  const old = (share.scriptVersion ?? 3) < 3;
+  const [open, setOpen] = useState(old);
+  const code = appsScriptCode(share.key);
+  return (
+    <div className="card mt16" style={old ? { background: 'var(--warning-soft)' } : undefined}>
+      {old ? (
+        <>
+          <div style={{ fontWeight: 700 }}>Actualiza el código de la hoja</div>
+          <p className="small" style={{ margin: '4px 0 0' }}>
+            La hoja tiene el código antiguo: la lista funciona, pero para compartir también la <b>cuenta conjunta</b> hay que poner el nuevo (2 minutos, mejor desde el
+            ordenador).
+          </p>
+        </>
+      ) : (
+        <button className="link-btn" style={{ padding: 0 }} onClick={() => setOpen(!open)}>
+          {open ? 'Ocultar' : 'Ver'} el código de la hoja
+        </button>
+      )}
+      {open && (
+        <>
+          <ol className="small" style={{ paddingLeft: 20, margin: '10px 0' }}>
+            <li>
+              Abre vuestra hoja de Google → <b>Extensiones → Apps Script</b>.
+            </li>
+            <li>
+              Borra todo, <b>pega el código</b> de abajo y pulsa <b>Guardar</b> 💾.
+            </li>
+            <li>
+              <b>Implementar → Gestionar implementaciones</b> → lápiz ✏️ → en «Versión» elige <b>Nueva versión</b> → <b>Implementar</b>. La dirección /exec es la misma: no hay que
+              tocar nada en los móviles.
+            </li>
+          </ol>
+          <div className="code-box" style={{ maxHeight: 110, overflow: 'auto', whiteSpace: 'pre', userSelect: 'text' }}>
+            {code}
+          </div>
+          <button className="btn secondary small mt8" onClick={async () => toast((await copyText(code)) ? 'Código copiado' : 'No se pudo copiar')}>
+            <Copy size={16} /> Copiar código
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -155,7 +155,8 @@ export function ListModule({ area, list }: { area: Area; list: ListKey }) {
   );
 }
 
-function ShareStatus({ onSetup }: { onSetup: () => void }) {
+/** Estado del hogar compartido (o la invitación a compartir). */
+export function ShareStatus({ onSetup, what = 'la lista' }: { onSetup: () => void; what?: 'la lista' | 'la cuenta conjunta' }) {
   const state = useApp();
   const syncing = useShareSyncing();
   const share = state.share;
@@ -165,19 +166,32 @@ function ShareStatus({ onSetup }: { onSetup: () => void }) {
         <Users size={22} color="var(--primary)" />
         <div className="grow">
           <div style={{ fontWeight: 700 }}>Compartir con tu pareja</div>
-          <div className="small muted">Misma lista en los dos móviles: lo que uno apunta, el otro lo ve.</div>
+          <div className="small muted">
+            {what === 'la lista'
+              ? 'Misma lista en los dos móviles: lo que uno apunta, el otro lo ve.'
+              : 'Los dos veis y apuntáis los gastos de la cuenta conjunta, cada uno desde su móvil.'}
+          </div>
         </div>
       </button>
     );
   }
   const ago = share.lastSync ? Math.round((Date.now() - share.lastSync) / 60000) : null;
+  const oldScript = what === 'la cuenta conjunta' && (share.scriptVersion ?? 3) < 3;
+  const warn = !!share.error || oldScript;
   return (
-    <div className={`card hstack ${share.error ? 'tone-amber' : ''}`} style={share.error ? { background: 'var(--warning-soft)' } : undefined}>
-      <Users size={20} color={share.error ? 'var(--warning)' : 'var(--success)'} />
+    <div className={`card hstack ${warn ? 'tone-amber' : ''}`} style={warn ? { background: 'var(--warning-soft)' } : undefined}>
+      <Users size={20} color={warn ? 'var(--warning)' : 'var(--success)'} />
       <div className="grow small" role="button" tabIndex={0} onClick={onSetup}>
         <b>{share.name} compartido</b>
         <div className="muted">
-          {share.error ?? (ago === null ? 'Conectando…' : ago < 1 ? 'Al día' : `Actualizado hace ${ago} min`)}
+          {share.error ??
+            (oldScript
+              ? 'Para compartir también la cuenta conjunta, actualiza el código de la hoja (toca aquí).'
+              : ago === null
+                ? 'Conectando…'
+                : ago < 1
+                  ? 'Al día'
+                  : `Actualizado hace ${ago} min`)}
         </div>
       </div>
       <button className="icon-btn small" aria-label="Actualizar" disabled={syncing} onClick={() => void syncShare()}>

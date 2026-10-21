@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import { applySyncResult, getState, patchShare } from '../store/store';
+import { applyFinanceSync, applySyncResult, getState, patchShare } from '../store/store';
 import type { ID, ListItem, ShareConfig } from '../store/types';
+import { financeOutbox, mergeFinance, type SharedRecords } from './financeSync';
 
 /*
  * Hogar compartido: las listas se guardan en una hoja de cálculo de Google con
@@ -56,9 +57,18 @@ export function readJoinCode(text: string): Pick<ShareConfig, 'url' | 'key' | 'n
 
 /* ---------- Comunicación con la hoja ---------- */
 
-async function readResponse(res: Response): Promise<ListItem[]> {
+export interface ServerData {
+  items: ListItem[];
+  /** Cuenta conjunta (solo con el código de la hoja versión 3 o posterior). */
+  registros?: SharedRecords;
+  version: number;
+  /** Hora de la hoja (para pedir la próxima vez solo lo nuevo). */
+  ahora?: number;
+}
+
+async function readResponse(res: Response): Promise<ServerData> {
   const text = await res.text();
-  let data: { ok?: boolean; error?: string; items?: ListItem[] };
+  let data: { ok?: boolean; error?: string; items?: ListItem[]; registros?: SharedRecords; version?: number; ahora?: number };
   try {
     data = JSON.parse(text);
   } catch {
@@ -68,7 +78,7 @@ async function readResponse(res: Response): Promise<ListItem[]> {
     if (data.error === 'clave') throw new ShareError('key', 'La clave no coincide con la de la hoja. Vuelve a copiar el código.');
     throw new ShareError('server', 'La hoja ha devuelto un error.');
   }
-  return (data.items ?? []).map((i) => ({
+  const items = (data.items ?? []).map((i) => ({
     id: String(i.id),
     list: i.list,
     text: String(i.text ?? ''),
@@ -78,17 +88,25 @@ async function readResponse(res: Response): Promise<ListItem[]> {
     by: i.by || undefined,
     deleted: !!i.deleted,
   }));
+  return { items, registros: data.registros, version: Number(data.version) || 2, ahora: Number(data.ahora) || undefined };
 }
 
-async function call(share: Pick<ShareConfig, 'url' | 'key'>, changes: ListItem[] | null, fetchImpl: FetchLike): Promise<ListItem[]> {
+async function call(
+  share: Pick<ShareConfig, 'url' | 'key'>,
+  changes: ListItem[] | null,
+  registros: SharedRecords | null,
+  desde: number,
+  fetchImpl: FetchLike,
+): Promise<ServerData> {
   let res: Response;
   try {
-    if (changes === null) {
+    if (changes === null && registros === null) {
       const sep = share.url.includes('?') ? '&' : '?';
-      res = await fetchImpl(`${share.url}${sep}clave=${encodeURIComponent(share.key)}&t=${Date.now()}`, { method: 'GET', redirect: 'follow', cache: 'no-store' });
+      res = await fetchImpl(`${share.url}${sep}clave=${encodeURIComponent(share.key)}&desde=${desde}&t=${Date.now()}`, { method: 'GET', redirect: 'follow', cache: 'no-store' });
     } else {
       // Sin cabeceras: así el navegador no hace la consulta previa (CORS) que Apps Script no admite.
-      res = await fetchImpl(share.url, { method: 'POST', redirect: 'follow', body: JSON.stringify({ clave: share.key, cambios: changes }) });
+      const body = JSON.stringify({ clave: share.key, cambios: changes ?? [], ...(registros ? { registros } : {}), desde });
+      res = await fetchImpl(share.url, { method: 'POST', redirect: 'follow', body });
     }
   } catch {
     throw new ShareError('offline', 'Sin conexión: los cambios se enviarán cuando vuelva internet.');
@@ -97,9 +115,22 @@ async function call(share: Pick<ShareConfig, 'url' | 'key'>, changes: ListItem[]
   return readResponse(res);
 }
 
-export const fetchSharedItems = (share: Pick<ShareConfig, 'url' | 'key'>, fetchImpl: FetchLike = fetch) => call(share, null, fetchImpl);
-export const pushSharedItems = (share: Pick<ShareConfig, 'url' | 'key'>, changes: ListItem[], fetchImpl: FetchLike = fetch) =>
-  call(share, changes, fetchImpl);
+export const fetchSharedItems = async (share: Pick<ShareConfig, 'url' | 'key'>, fetchImpl: FetchLike = fetch) => (await call(share, null, null, 0, fetchImpl)).items;
+export const pushSharedItems = async (share: Pick<ShareConfig, 'url' | 'key'>, changes: ListItem[], fetchImpl: FetchLike = fetch) =>
+  (await call(share, changes, null, 0, fetchImpl)).items;
+
+/** Envía lo pendiente (listas y cuenta conjunta) y recibe lo nuevo desde `desde`. */
+export function exchange(
+  share: Pick<ShareConfig, 'url' | 'key'>,
+  lists: ListItem[],
+  records: SharedRecords,
+  desde: number,
+  fetchImpl: FetchLike = fetch,
+): Promise<ServerData> {
+  const hasRecords = Object.values(records).some((r) => r?.length);
+  if (!lists.length && !hasRecords) return call(share, null, null, desde, fetchImpl);
+  return call(share, lists, hasRecords ? records : null, desde, fetchImpl);
+}
 
 /* ---------- Fusión ---------- */
 
@@ -164,6 +195,12 @@ export function useShareSyncing(): boolean {
   );
 }
 
+/** Tras abrir la app se pide todo una vez (así se olvida lo borrado hace tiempo); luego, solo lo nuevo. */
+let fullDone = false;
+const FULL_EVERY = 20 * 86400000;
+/** Margen al pedir «lo nuevo» por si la otra petición estaba a medias. */
+const OVERLAP = 2 * 60000;
+
 export async function syncShare(): Promise<void> {
   if (syncing) {
     again = true;
@@ -179,12 +216,24 @@ export async function syncShare(): Promise<void> {
       if (!share) return;
       const sentIds = new Set(s.listPending);
       const sent = s.listItems.filter((i) => sentIds.has(i.id));
+      const out = financeOutbox(s.finance, s.settings.name.trim() || undefined);
+      const full = !fullDone || !share.since || Date.now() - share.since > FULL_EVERY;
       try {
-        const server = sent.length ? await pushSharedItems(share, sent) : await fetchSharedItems(share);
+        const server = await exchange(share, sent, out.records, full ? 0 : Math.max(0, (share.since ?? 0) - OVERLAP));
         const cur = getState();
         if (!cur.share || cur.share.url !== share.url) return;
-        const r = reconcile({ items: cur.listItems, pending: cur.listPending }, sent, server);
-        applySyncResult(r.items, r.pending, { lastSync: Date.now(), error: undefined });
+        const r = reconcile({ items: cur.listItems, pending: cur.listPending }, sent, server.items);
+        const finOk = server.version >= 3 && !!server.registros;
+        applySyncResult(r.items, r.pending, {
+          lastSync: Date.now(),
+          error: undefined,
+          scriptVersion: server.version,
+          ...(finOk && server.ahora ? { since: server.ahora } : {}),
+        });
+        if (finOk) {
+          applyFinanceSync(mergeFinance(getState().finance, out.sent, server.registros!, full), {});
+          if (full) fullDone = true;
+        }
       } catch (err) {
         patchShare({ error: err instanceof ShareError ? err.message : 'No se pudo sincronizar.' });
         return;

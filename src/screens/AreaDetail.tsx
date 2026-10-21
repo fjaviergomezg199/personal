@@ -4,6 +4,7 @@ import { confirmDialog, Empty, Sheet, Switch, toast } from '../components/ui';
 import { navigate, useRoute } from '../lib/router';
 import { DiaryModule } from '../modules/DiaryModule';
 import { DocsModule } from '../modules/DocsModule';
+import { FinanceModule } from '../modules/FinanceModule';
 import { GoalsModule } from '../modules/GoalsModule';
 import { LiftsModule } from '../modules/LiftsModule';
 import { ListModule } from '../modules/ListModule';
@@ -90,6 +91,8 @@ export function AreaDetail({ id }: { id: string }) {
       {current === 'chores' && <ListModule area={area} list="casa" />}
       {current === 'diary' && <DiaryModule area={area} />}
       {current === 'metrics' && <MetricsModule area={area} />}
+      {current === 'money' && <FinanceModule area={area} scope="personal" />}
+      {current === 'jointMoney' && <FinanceModule area={area} scope="hogar" />}
 
       {settings && <AreaSettingsSheet area={area} onClose={() => setSettings(false)} />}
     </div>

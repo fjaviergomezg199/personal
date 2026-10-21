@@ -1,60 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ListItem } from '../store/types';
-import { appsScriptCode } from './shareScript';
 import { makeJoinCode, readJoinCode, reconcile, ShareError, syncOnce, type LocalLists } from './shareSync';
-
-/* -------- Simulador de Google Sheets + Apps Script (ejecuta el código real) -------- */
-
-type Cell = string | number | boolean;
-
-function fakeGoogle() {
-  const sheets: Record<string, Cell[][]> = {};
-  const formats: string[] = [];
-  const clean = (row: Cell[]) => row.map((v) => (typeof v === 'string' && v.startsWith("'") ? v.slice(1) : v));
-  const sheet = (name: string) => ({
-    appendRow: (row: Cell[]) => void sheets[name].push(clean(row)),
-    getDataRange: () => ({ getValues: () => sheets[name].map((r) => [...r]) }),
-    getRange: (a: string | number, _col?: number) =>
-      typeof a === 'string'
-        ? { setNumberFormat: (f: string) => void formats.push(`${a}=${f}`) }
-        : { setValues: (vals: Cell[][]) => void (sheets[name][a - 1] = clean(vals[0])) },
-    setFrozenRows: () => undefined,
-    deleteRow: (row: number) => void sheets[name].splice(row - 1, 1),
-  });
-  const SpreadsheetApp = {
-    getActiveSpreadsheet: () => ({
-      getSheetByName: (n: string) => (sheets[n] ? sheet(n) : null),
-      insertSheet: (n: string) => {
-        sheets[n] = [];
-        return sheet(n);
-      },
-    }),
-  };
-  const LockService = { getScriptLock: () => ({ waitLock: () => undefined, releaseLock: () => undefined }) };
-  const ContentService = {
-    MimeType: { JSON: 'application/json' },
-    createTextOutput: (text: string) => ({ setMimeType: () => ({ getContent: () => text }) }),
-  };
-  const code = appsScriptCode('CLAVE123');
-  const fns = new Function('SpreadsheetApp', 'LockService', 'ContentService', `${code}\nreturn { doGet, doPost };`)(
-    SpreadsheetApp,
-    LockService,
-    ContentService,
-  ) as { doGet: (e: unknown) => { getContent: () => string }; doPost: (e: unknown) => { getContent: () => string } };
-
-  const URL_ = 'https://script.google.com/macros/s/AKfy_test/exec';
-  const fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
-    if (!url.startsWith(URL_)) throw new TypeError('Failed to fetch');
-    // Sin cabeceras propias: evita la consulta previa CORS que Apps Script no contesta.
-    expect(init.headers).toBeUndefined();
-    const out =
-      init.method === 'POST'
-        ? fns.doPost({ postData: { contents: String(init.body) } })
-        : fns.doGet({ parameter: Object.fromEntries(new URL(url).searchParams) });
-    return new Response(out.getContent(), { status: 200 });
-  });
-  return { sheets, formats, fetchImpl, share: { url: URL_, key: 'CLAVE123' } };
-}
+import { fakeGoogle } from './testing/fakeGoogle';
 
 const item = (p: Partial<ListItem>): ListItem => ({ id: 'L1', list: 'compra', text: 'Leche', done: false, updatedAt: 1000, ...p });
 
@@ -67,7 +14,9 @@ describe('Apps Script del hogar compartido', () => {
     const r = await syncOnce({ items: [], pending: [] }, g.share, g.fetchImpl);
     expect(r).toEqual({ items: [], pending: [] });
     expect(g.sheets.Lista[0]).toEqual(['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado']);
-    expect(g.formats).toEqual(['A:D=@', 'G:G=@']);
+    // Todo en formato texto: Sheets no convierte «1/2» en fecha ni «007» en 7
+    expect(g.formats).toEqual(['A:Z=@', 'A:Z=@', 'A:Z=@', 'A:D=@', 'G:G=@']);
+    expect(Object.keys(g.sheets).sort()).toEqual(['Cuenta', 'Fijos', 'Lista', 'Movimientos']);
   });
 
   it('dos móviles comparten la lista', async () => {

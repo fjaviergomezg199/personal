@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeState } from './store';
 import type { AppState } from './types';
 
-describe('migración de datos v1 → v2', () => {
+describe('migración de datos v1 → v3', () => {
   const v1 = {
     version: 1,
     areas: [
@@ -22,7 +22,7 @@ describe('migración de datos v1 → v2', () => {
   const s = normalizeState(v1);
 
   it('pasa la lista de la compra a la lista compartible', () => {
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(s.listItems.filter((i) => i.list === 'compra').map((i) => [i.text, i.done])).toEqual([
       ['Leche', false],
       ['Pan', true],
@@ -35,7 +35,7 @@ describe('migración de datos v1 → v2', () => {
   it('las tareas sin fecha de casa van a «Tareas de casa»; lo que tiene fecha se queda en la agenda', () => {
     expect(s.listItems.filter((i) => i.list === 'casa').map((i) => i.text)).toEqual(['Limpiar nevera']);
     const casa = s.areas.find((a) => a.id === 'casa')!;
-    expect(casa.modules).toEqual(['shopping', 'chores', 'tasks', 'notes']);
+    expect(casa.modules).toEqual(['shopping', 'chores', 'jointMoney', 'tasks', 'notes']);
     expect(s.entries.map((e) => e.id)).toEqual(['e4', 'e5']);
   });
 
@@ -46,9 +46,40 @@ describe('migración de datos v1 → v2', () => {
     expect(s.listPending).toEqual([]);
   });
 
-  it('no vuelve a migrar datos v2', () => {
+  it('sin terminar la bienvenida no se crea el área de finanzas', () => {
+    expect(s.areas.some((a) => a.modules.includes('money'))).toBe(false);
+    expect(s.finance.movements).toEqual([]);
+    expect(s.finance.accounts.personal).toEqual({ periodStarts: [], budgets: {}, stamps: {} });
+  });
+
+  it('no vuelve a migrar datos ya convertidos', () => {
     const again = normalizeState(s);
     expect(again.listItems).toHaveLength(3);
     expect(again.areas.find((a) => a.id === 'nut')!.modules).toEqual(s.areas.find((a) => a.id === 'nut')!.modules);
+  });
+});
+
+describe('migración v2 → v3', () => {
+  const v2 = {
+    version: 2,
+    settings: { name: 'Leire', onboarded: true },
+    areas: [
+      { id: 'h', name: 'Hogar', template: 'home', modules: ['shopping', 'chores', 'notes'], showOnToday: true, order: 0, emoji: '🏠', color: 'amber', createdAt: '', updatedAt: '' },
+    ],
+    listItems: [{ id: 'L1', list: 'compra', text: 'Leche', done: false, updatedAt: 1 }],
+  } as unknown as Partial<AppState>;
+  const s = normalizeState(v2);
+
+  it('añade la cuenta conjunta al hogar y un área de finanzas', () => {
+    expect(s.version).toBe(3);
+    expect(s.areas[0].modules).toEqual(['shopping', 'chores', 'jointMoney', 'notes']);
+    const money = s.areas.find((a) => a.template === 'money')!;
+    expect(money).toMatchObject({ name: 'Finanzas', modules: ['money', 'jointMoney', 'notes'], order: 1 });
+    expect(s.listItems).toHaveLength(1);
+  });
+
+  it('solo una vez', () => {
+    const again = normalizeState(s);
+    expect(again.areas.filter((a) => a.template === 'money')).toHaveLength(1);
   });
 });

@@ -8,7 +8,9 @@ import { openSheet } from '../components/sheets';
 import { Empty, SectionHead } from '../components/ui';
 import { addDays, capitalize, formatLong, formatRelative, formatShort, greeting, toISODate } from '../lib/dates';
 import { clearQuery, navigate, useRoute } from '../lib/router';
+import { currentPeriod, daysLeft, eur, eurInt, occurrencesIn, payDue, summarizePeriod } from '../lib/finance';
 import { sumMacros } from '../lib/foods';
+import { MovementSheet } from '../sheets/MovementSheet';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
 import { useApp } from '../store/store';
@@ -149,6 +151,7 @@ export function Today() {
       ))}
 
       <MacrosPeek today={today} />
+      <FinancePeek today={today} />
 
       {goals.length > 0 && (
         <div className="section">
@@ -284,6 +287,61 @@ function MacrosPeek({ today }: { today: string }) {
       <div className={`card tone-${area.color}`} role="button" tabIndex={0} onClick={open} style={{ cursor: 'pointer' }}>
         <MacroSummary total={sumMacros(logs)} targets={targets} compact />
       </div>
+    </div>
+  );
+}
+
+/** Lo gastado en el periodo y los fijos que se cargan hoy o mañana. */
+function FinancePeek({ today }: { today: string }) {
+  const state = useApp();
+  const [adding, setAdding] = useState(false);
+  const area = sortedAreas(state).find((a) => a.showOnToday && a.modules.includes('money'));
+  if (!area) return null;
+  const fin = state.finance;
+  const acc = fin.accounts.personal;
+  const period = currentPeriod(acc, today);
+  const s = summarizePeriod(fin, 'personal', period, today);
+  const soon = occurrencesIn(fin.recurring, fin.movements, today, addDays(today, 1), today).filter((o) => !o.movement && o.recurring.kind === 'gasto');
+  if (!acc.periodStarts.length && !s.movements.length && !soon.length) return null;
+  const left = daysLeft(period, today);
+  const total = acc.budgetTotal;
+  const over = total !== undefined && s.spent > total;
+  return (
+    <div className="section">
+      <SectionHead
+        title={`${area.emoji} ${area.name}`}
+        action={
+          <button className="link-btn" onClick={() => setAdding(true)}>
+            + Gasto
+          </button>
+        }
+      />
+      <div className={`card tone-${area.color}`} role="button" tabIndex={0} onClick={() => navigate(`/areas/${area.id}?bloque=money`)} style={{ cursor: 'pointer' }}>
+        <div className="ms-head">
+          <div>
+            <div className="ms-label">Gastado este periodo</div>
+            <div className="ms-hero" style={{ fontSize: 28 }}>
+              {eurInt(s.spent)}
+              {total !== undefined && <span className="ms-of"> de {eurInt(total)}</span>}
+            </div>
+          </div>
+          <div className="ms-left">
+            {payDue(acc, today) ? '¿Has cobrado ya?' : left > 0 ? `Quedan ${left} ${left === 1 ? 'día' : 'días'}` : 'Esperando el cobro'}
+            {total !== undefined && !over && <div className="tiny">{eurInt(total - s.spent)} libres</div>}
+          </div>
+        </div>
+        {total !== undefined && (
+          <div className={`meter mt8 ${over ? 'over' : ''}`}>
+            <div style={{ width: `${Math.min(100, (s.spent / total) * 100)}%` }} />
+          </div>
+        )}
+        {soon.map((o) => (
+          <div key={`${o.recurring.id}-${o.date}`} className="small muted mt8">
+            📆 {o.date === today ? 'Hoy' : 'Mañana'} se carga {o.recurring.name} ({eur(o.amount)}){o.recurring.scope === 'hogar' ? ', cuenta conjunta' : ''}
+          </div>
+        ))}
+      </div>
+      {adding && <MovementSheet scope="personal" kind="gasto" onClose={() => setAdding(false)} />}
     </div>
   );
 }

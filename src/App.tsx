@@ -112,7 +112,12 @@ function useAlerts() {
           let shown = false;
           if (s.settings.notifications) shown = await showSystemNotification(a);
           if (!shown && document.visibilityState === 'visible') {
-            toast(`${a.title}${a.body ? ` · ${a.body}` : ''}`, { duration: 9000 });
+            const route = a.route;
+            toast(`${a.title}${a.body ? ` · ${a.body}` : ''}`, {
+              duration: 9000,
+              action: route.includes('cerrar=') ? 'Empezar' : 'Ver',
+              onAction: () => void (location.hash = route),
+            });
             shown = true;
           }
           if (shown) done.push(a.key);

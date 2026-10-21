@@ -51,7 +51,7 @@ export function weekSummary(s: AppState, start: ISODate, today: ISODate): WeekSu
   const mine = (by: string | undefined) => !by || by.trim().toLowerCase() === me;
   const done: WeekSummary['done'] = [];
   for (const e of s.entries) {
-    if (e.kind === 'event' || (e.shared && !mine(e.by))) continue;
+    if (e.kind === 'event' || e.ritual || (e.shared && !mine(e.by))) continue;
     if (e.repeat !== 'none') {
       for (const d of e.doneDates ?? []) if (inWeek(d)) done.push({ key: `${e.id}:${d}`, title: e.title, date: d });
     } else if (e.done) {

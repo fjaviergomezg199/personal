@@ -8,36 +8,58 @@ export const countOn = (log: Record<ISODate, number> | undefined, date: ISODate)
 
 export const doneOn = (h: Habit, log: Record<ISODate, number> | undefined, date: ISODate) => countOn(log, date) >= h.target;
 
+/** Comodín: un fallo suelto no rompe la racha, como mucho uno cada 7 veces que toca. */
+export const FREEZE_EVERY = 7;
+
 /**
- * Racha: días seguidos (de los que toca) cumplidos hasta hoy. Si hoy aún no está
- * hecho, no la rompe: cuenta desde ayer.
+ * Racha: días (de los que toca) cumplidos seguidos hasta hoy. Si hoy aún no está
+ * hecho, no la rompe: cuenta desde ayer. Un fallo suelto se perdona con el
+ * comodín (no suma, pero no rompe); dos seguidos, o dos en menos de 7 veces, sí.
  */
-export function streak(h: Habit, log: Record<ISODate, number> | undefined, today: ISODate): number {
+export function streakInfo(h: Habit, log: Record<ISODate, number> | undefined, today: ISODate): { days: number; freezes: ISODate[] } {
   let n = 0;
+  let occ = 0;
+  let lastFreeze = -Infinity;
+  let oldestDone: ISODate | undefined;
+  const freezes: ISODate[] = [];
   let d = today;
   if (scheduled(h, d) && !doneOn(h, log, d)) d = addDays(d, -1);
   const created = localDay(h.createdAt);
-  for (let k = 0; k < 3660; k++, d = addDays(d, -1)) {
-    if (!scheduled(h, d)) {
-      if (d < created) break;
-      continue;
-    }
-    if (!doneOn(h, log, d)) break;
-    n++;
+  for (let k = 0; k < 3660 && d >= created; k++, d = addDays(d, -1)) {
+    if (!scheduled(h, d)) continue;
+    if (doneOn(h, log, d)) {
+      n++;
+      oldestDone = d;
+    } else if (occ - lastFreeze >= FREEZE_EVERY) {
+      freezes.push(d);
+      lastFreeze = occ;
+    } else break;
+    occ++;
   }
-  return n;
+  // Un comodín antes de que empezara la racha no ha salvado nada.
+  return { days: n, freezes: oldestDone ? freezes.filter((f) => f > oldestDone!) : [] };
 }
 
-/** La mejor racha que ha habido. */
+export const streak = (h: Habit, log: Record<ISODate, number> | undefined, today: ISODate): number => streakInfo(h, log, today).days;
+
+/** La mejor racha que ha habido (con el mismo comodín). */
 export function bestStreak(h: Habit, log: Record<ISODate, number> | undefined, today: ISODate): number {
   const dates = Object.keys(log ?? {}).sort();
   if (!dates.length) return 0;
   let best = 0;
   let run = 0;
+  let occ = 0;
+  let lastFreeze = -Infinity;
   for (let d = dates[0]; d <= today; d = addDays(d, 1)) {
     if (!scheduled(h, d)) continue;
     if (doneOn(h, log, d)) best = Math.max(best, ++run);
-    else if (d < today) run = 0;
+    else if (d === today) continue; // hoy aún no cuenta
+    else if (run > 0 && occ - lastFreeze >= FREEZE_EVERY) lastFreeze = occ;
+    else {
+      run = 0;
+      lastFreeze = -Infinity;
+    }
+    occ++;
   }
   return best;
 }

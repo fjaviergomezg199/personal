@@ -17,6 +17,7 @@ describe('orden de la pantalla Hoy', () => {
     ]);
     // Lo que no estaba guardado va detrás del bloque que le precede en el orden de siempre
     expect(r.map((x) => (x.hidden ? `(${x.key})` : x.key))).toEqual([
+      'close', // nuevo y el primero de siempre: arriba del todo
       'money',
       'dayview',
       'week',

@@ -36,7 +36,7 @@ export function agendaForDate(s: AppState, date: ISODate, areas = areaMap(s)): A
     if (next === date) out.push({ kind: 'birthday', key: `b:${b.id}`, date, birthday: b, age: ageOn(b.year, date) });
   }
   for (const e of s.entries) {
-    if (!e.date || !occursOn(e, date)) continue;
+    if (e.ritual || !e.date || !occursOn(e, date)) continue;
     const area = e.areaId ? areas.get(e.areaId) : undefined;
     if (area && !area.showOnToday && e.kind === 'task') continue;
     const multiDayMiddle = e.repeat === 'none' && e.date !== date;

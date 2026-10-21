@@ -53,10 +53,10 @@ export function dueAlerts(s: AppState, now: Date, lookbackMs = 6 * 3600000): Due
       const when = e.time ? `${date === toISODate(now) ? 'Hoy' : date} a las ${e.time}` : 'Todo el día';
       out.push({
         key,
-        title: `${cat ? cat.emoji + ' ' : '⏰ '}${e.title}`,
-        body: [when, e.location, e.notes].filter(Boolean).join(' · ').slice(0, 180),
+        title: e.ritual ? e.title : `${cat ? cat.emoji + ' ' : '⏰ '}${e.title}`,
+        body: (e.ritual ? [e.notes] : [when, e.location, e.notes]).filter(Boolean).join(' · ').slice(0, 180),
         at,
-        route: `#/hoy?ver=${e.id}`,
+        route: e.ritual ? '#/hoy?cerrar=1' : `#/hoy?ver=${e.id}`,
       });
     }
   }

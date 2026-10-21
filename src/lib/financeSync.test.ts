@@ -6,7 +6,7 @@ import { exchange } from './shareSync';
 import { fakeGoogle } from './testing/fakeGoogle';
 
 const mov = (p: Partial<Movement>): Movement => ({
-  id: 'M1', scope: 'hogar', kind: 'gasto', date: '2026-10-20', amount: 54.3, category: 'super', note: 'Mercadona', updatedAt: 1000, by: 'Leire', ...p,
+  id: 'M1', scope: 'hogar', kind: 'gasto', date: '2026-10-20', amount: 54.3, category: 'super', note: 'Mercadona', updatedAt: 1000, by: 'Leyre', ...p,
 });
 const fixed = (p: Partial<Recurring>): Recurring => ({
   id: 'F1', scope: 'hogar', kind: 'gasto', name: 'Hipoteca', amount: 750, category: 'hipoteca', day: 1, every: 1, from: '2026-09-25', active: true, updatedAt: 1000, ...p,
@@ -36,7 +36,7 @@ describe('cuenta conjunta compartida', () => {
     const a = await sync(g, leire);
     expect(a.fin.pending).toEqual([]);
     // La hoja se puede leer: una fila por movimiento, en texto
-    expect(g.sheets.Movimientos[1].slice(0, 8)).toEqual(['M1', '2026-10-20', '54.3', 'gasto', 'super', 'Mercadona', '', 'Leire']);
+    expect(g.sheets.Movimientos[1].slice(0, 8)).toEqual(['M1', '2026-10-20', '54.3', 'gasto', 'super', 'Mercadona', '', 'Leyre']);
     // Lo personal no sale del móvil
     expect(g.sheets.Movimientos).toHaveLength(2);
 

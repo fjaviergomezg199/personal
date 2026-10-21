@@ -62,7 +62,7 @@ describe('migración de datos v1 → v3', () => {
 describe('migración v2 → v3', () => {
   const v2 = {
     version: 2,
-    settings: { name: 'Leire', onboarded: true },
+    settings: { name: 'Leyre', onboarded: true },
     areas: [
       { id: 'h', name: 'Hogar', template: 'home', modules: ['shopping', 'chores', 'notes'], showOnToday: true, order: 0, emoji: '🏠', color: 'amber', createdAt: '', updatedAt: '' },
     ],

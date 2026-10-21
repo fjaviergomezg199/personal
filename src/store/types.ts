@@ -350,9 +350,24 @@ export interface GoogleSettings {
   lastSync?: string;
 }
 
+export type Accent = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
+export type Backdrop = 'warm' | 'neutral' | 'cool' | 'tinted';
+export type TextSize = 'normal' | 'large' | 'xlarge';
+/** Bloques de la pantalla Hoy (se pueden ordenar y ocultar). */
+export type TodaySection = 'dayview' | 'shopping' | 'overdue' | 'menu' | 'diary' | 'money' | 'habits' | 'week' | 'goals' | 'inbox' | 'upcoming';
+
 export interface Settings {
   name: string;
   theme: 'auto' | 'light' | 'dark';
+  /** Color principal de la app. */
+  accent?: Accent;
+  /** Tono del fondo. */
+  backdrop?: Backdrop;
+  textSize?: TextSize;
+  /** Emoji del saludo («Buenos días, Leyre 👋»). */
+  emoji?: string;
+  /** Orden y visibilidad de los bloques de Hoy. */
+  todayLayout?: { key: TodaySection; hidden?: boolean }[];
   /** Aviso por defecto para elementos con hora (minutos). */
   defaultAlert: number | null;
   /** Aviso de cumpleaños (minutos antes de las 00:00 del día). */

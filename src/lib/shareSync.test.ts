@@ -21,14 +21,14 @@ describe('Apps Script del hogar compartido', () => {
 
   it('dos móviles comparten la lista', async () => {
     const g = fakeGoogle();
-    let a: LocalLists = { items: [item({ id: 'La', text: 'Leche', by: 'Leire' }), item({ id: 'Lb', text: 'Pan', qty: '2' })], pending: ['La', 'Lb'] };
+    let a: LocalLists = { items: [item({ id: 'La', text: 'Leche', by: 'Leyre' }), item({ id: 'Lb', text: 'Pan', qty: '2' })], pending: ['La', 'Lb'] };
     let b: LocalLists = { items: [], pending: [] };
 
     a = await syncOnce(a, g.share, g.fetchImpl);
     expect(a.pending).toEqual([]);
     b = await syncOnce(b, g.share, g.fetchImpl);
     expect(b.items.map((i) => [i.text, i.qty, i.by])).toEqual([
-      ['Leche', undefined, 'Leire'],
+      ['Leche', undefined, 'Leyre'],
       ['Pan', '2', undefined],
     ]);
 

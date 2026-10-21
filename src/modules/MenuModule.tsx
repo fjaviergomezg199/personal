@@ -33,7 +33,7 @@ export function MenuModule({ area }: { area: Area }) {
       <div className="week-strip" style={{ marginBottom: 12 }}>
         {WEEKDAY_LETTERS.map((l, i) => (
           <button key={l} className={`day-pill ${i === todayIdx ? 'today' : ''} ${i === day ? 'on' : ''}`} onClick={() => setDay(i)} aria-label={WEEKDAYS[i]}>
-            <span className="n" style={{ fontSize: 16 }}>
+            <span className="n" style={{ fontSize: 'calc(16px * var(--fs))' }}>
               {l}
             </span>
             <span className="dots">{Object.keys(menu.days[i] ?? {}).length ? <i /> : null}</span>

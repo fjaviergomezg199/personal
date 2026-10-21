@@ -1,6 +1,6 @@
 import { Bell, CalendarCheck, Copy, Download, RefreshCw, Smartphone, Upload, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { confirmDialog, Segmented, SectionHead, Switch, toast } from '../components/ui';
+import { confirmDialog, SectionHead, Switch, toast } from '../components/ui';
 import { exportBackup, importBackup } from '../lib/backup';
 import { formatAlert, formatRelative, toISODate } from '../lib/dates';
 import { copyText } from '../lib/files';
@@ -10,8 +10,8 @@ import { pendingGoogleChanges } from '../lib/sync';
 import { connectGoogle, runSync, useSyncStatus } from '../lib/syncRunner';
 import { kv, requestPersistence } from '../store/db';
 import { createInitialState, replaceState, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
-import type { Settings as SettingsT } from '../store/types';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
+import { AppearanceCard } from './Appearance';
 import { InstallCard } from './Install';
 
 
@@ -59,17 +59,7 @@ export function Settings() {
 
       <div className="section">
         <SectionHead title="Apariencia" />
-        <div className="card">
-          <Segmented<SettingsT['theme']>
-            value={s.theme}
-            onChange={(theme) => updateSettings({ theme })}
-            options={[
-              { value: 'auto', label: 'Automático' },
-              { value: 'light', label: 'Claro' },
-              { value: 'dark', label: 'Oscuro' },
-            ]}
-          />
-        </div>
+        <AppearanceCard />
       </div>
 
       <div className="section">

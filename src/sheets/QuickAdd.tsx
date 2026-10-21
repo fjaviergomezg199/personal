@@ -93,7 +93,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
         ref={inputRef}
         autoFocus
         className="textarea"
-        style={{ minHeight: 56, fontSize: 17 }}
+        style={{ minHeight: 56, fontSize: 'calc(17px * var(--fs))' }}
         rows={2}
         placeholder="¿Qué quieres apuntar? Ej.: mañana a las 10 dentista"
         value={text}

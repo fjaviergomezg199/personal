@@ -69,7 +69,7 @@ describe('parseQuick', () => {
   });
 
   it('esta tarde', () => {
-    expect(p('esta tarde llamar a Leire')).toMatchObject({ date: '2026-10-21', time: '17:00', title: 'Llamar a Leire', kind: 'reminder' });
+    expect(p('esta tarde llamar a Leyre')).toMatchObject({ date: '2026-10-21', time: '17:00', title: 'Llamar a Leyre', kind: 'reminder' });
   });
 
   it('mañana por la mañana', () => {

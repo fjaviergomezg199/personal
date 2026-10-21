@@ -417,7 +417,7 @@ function PickedPanel({ picked, onGrams, onBack }: { picked: Picked; onGrams: (g:
       <button className="link-btn small" onClick={onBack} style={{ marginLeft: -2 }}>
         <ArrowLeft size={15} style={{ verticalAlign: -2 }} /> Otro alimento
       </button>
-      <div style={{ fontWeight: 700, fontSize: 18, marginTop: 6 }}>{food.name}</div>
+      <div style={{ fontWeight: 700, fontSize: 'calc(18px * var(--fs))', marginTop: 6 }}>{food.name}</div>
       <div className="small muted">
         {food.brand ? `${food.brand} · ` : ''}Por 100 g: {fmt0(food.kcal)} kcal · {macroLine(food)}
       </div>
@@ -430,7 +430,7 @@ function PickedPanel({ picked, onGrams, onBack }: { picked: Picked; onGrams: (g:
           </label>
         </div>
         <div className="grow" style={{ textAlign: 'right', paddingBottom: 4 }}>
-          <div style={{ fontWeight: 750, fontSize: 22 }}>{fmt0(m.kcal)} kcal</div>
+          <div style={{ fontWeight: 750, fontSize: 'calc(22px * var(--fs))' }}>{fmt0(m.kcal)} kcal</div>
           <div className="small muted">{macroLine(m)}</div>
         </div>
       </div>

@@ -206,7 +206,7 @@ function FoodLogSheet({ item, meals, onClose }: { item: FoodLogItem; meals: stri
           </label>
         </div>
         <div className="grow" style={{ textAlign: 'right', paddingBottom: 4 }}>
-          <div style={{ fontWeight: 750, fontSize: 22 }}>{fmt0(m.kcal)} kcal</div>
+          <div style={{ fontWeight: 750, fontSize: 'calc(22px * var(--fs))' }}>{fmt0(m.kcal)} kcal</div>
           <div className="small muted">{macroLine(m)}</div>
         </div>
       </div>

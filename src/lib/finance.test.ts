@@ -21,7 +21,7 @@ describe('categorías y dinero', () => {
     expect(guessCategory('Netflix', 'gasto')).toBe('suscripciones');
     expect(guessCategory('recibo de la luz', 'gasto')).toBe('facturas');
     expect(guessCategory('Nómina octubre', 'ingreso')).toBe('nomina');
-    expect(guessCategory('bizum de Leire', 'ingreso')).toBe('extra');
+    expect(guessCategory('bizum de Leyre', 'ingreso')).toBe('extra');
     expect(guessCategory('algo raro', 'gasto')).toBeUndefined();
     expect(guessCategory('gasolina', 'ingreso')).toBeUndefined();
   });

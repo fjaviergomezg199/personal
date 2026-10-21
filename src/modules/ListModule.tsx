@@ -6,6 +6,7 @@ import { syncShare, useShareSyncing } from '../lib/shareSync';
 import { addListItems, deleteListItems, restoreListItems, updateListItem, useApp } from '../store/store';
 import type { Area, ListItem, ListKey } from '../store/types';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
+import { MenuShoppingSheet } from '../sheets/MenuShoppingSheet';
 
 const COPY: Record<ListKey, { placeholder: string; done: string; clear: string; empty: string; emptyText: string; emoji: string }> = {
   compra: {
@@ -32,6 +33,8 @@ export function ListModule({ area, list }: { area: Area; list: ListKey }) {
   const [showDone, setShowDone] = useState(false);
   const [editing, setEditing] = useState<ListItem | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [fromMenu, setFromMenu] = useState(false);
+  const menuArea = list === 'compra' ? state.areas.find((a) => a.menu && Object.values(a.menu.days).some((d) => Object.values(d ?? {}).some((t) => t.trim()))) : undefined;
   const copy = COPY[list];
   const me = state.settings.name.trim();
 
@@ -122,6 +125,12 @@ export function ListModule({ area, list }: { area: Area; list: ListKey }) {
         </button>
       </form>
 
+      {menuArea && (
+        <button className="link-btn" style={{ margin: '-6px 0 10px 2px' }} onClick={() => setFromMenu(true)}>
+          🍽️ Añadir lo que lleva el menú de la semana
+        </button>
+      )}
+
       {pending.length ? (
         groups.map((g) => (
           <div key={g.key} style={{ marginBottom: 12 }}>
@@ -151,6 +160,7 @@ export function ListModule({ area, list }: { area: Area; list: ListKey }) {
 
       {editing && <EditItemSheet item={editing} onClose={() => setEditing(null)} />}
       {sharing && <HomeShareSheet onClose={() => setSharing(false)} />}
+      {fromMenu && menuArea && <MenuShoppingSheet area={menuArea} onClose={() => setFromMenu(false)} />}
     </div>
   );
 }

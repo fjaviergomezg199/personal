@@ -1,4 +1,4 @@
-import { ClipboardPaste, Copy, Pencil, Sparkles } from 'lucide-react';
+import { ClipboardPaste, Copy, Pencil, ShoppingCart, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Empty, Sheet, toast } from '../components/ui';
 import { capitalize, todayISO, WEEKDAY_LETTERS, WEEKDAYS, weekdayIndex } from '../lib/dates';
@@ -6,6 +6,7 @@ import { copyText } from '../lib/files';
 import { DEFAULT_MEALS, menuPrompt, parseMenu } from '../lib/importers';
 import { setMeal, setMenu, updateArea } from '../store/store';
 import type { Area, Menu } from '../store/types';
+import { MenuShoppingSheet } from '../sheets/MenuShoppingSheet';
 import { pasteFromClipboard } from './ImportPlanSheet';
 
 export function MenuModule({ area }: { area: Area }) {
@@ -14,6 +15,7 @@ export function MenuModule({ area }: { area: Area }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [mealsEdit, setMealsEdit] = useState(false);
+  const [shopping, setShopping] = useState(false);
   const menu: Menu = area.menu ?? { meals: [...DEFAULT_MEALS], days: {} };
   const dayMenu = menu.days[day] ?? {};
   const meals = [...menu.meals, ...Object.keys(dayMenu).filter((m) => !menu.meals.includes(m))];
@@ -28,6 +30,11 @@ export function MenuModule({ area }: { area: Area }) {
         <button className="btn secondary small" onClick={() => setMealsEdit(true)}>
           <Pencil size={16} /> Comidas
         </button>
+        {hasAny && (
+          <button className="btn secondary small" onClick={() => setShopping(true)}>
+            <ShoppingCart size={16} /> A la compra
+          </button>
+        )}
       </div>
 
       <div className="week-strip" style={{ marginBottom: 12 }}>
@@ -74,6 +81,7 @@ export function MenuModule({ area }: { area: Area }) {
       {editing && <MealSheet area={area} day={day} meal={editing} text={dayMenu[editing] ?? ''} onClose={() => setEditing(null)} />}
       {importing && <ImportMenuSheet area={area} onClose={() => setImporting(false)} />}
       {mealsEdit && <MealsSheet area={area} menu={menu} onClose={() => setMealsEdit(false)} />}
+      {shopping && <MenuShoppingSheet area={area} onClose={() => setShopping(false)} />}
     </div>
   );
 }

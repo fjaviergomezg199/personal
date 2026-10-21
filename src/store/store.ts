@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { addDays, todayISO, weekKey, monthKey } from '../lib/dates';
 import { aliasesFor } from '../lib/lifts';
-import { fold } from '../lib/quickParse';
+import { sameItem } from '../lib/menuShopping';
 import { DEFAULT_MEALS } from '../lib/importers';
 import { files, kv } from './db';
 import { templateInfo } from './templates';
@@ -631,7 +631,7 @@ function listUpdate(mutator: (s: AppState) => void) {
   for (const fn of listListeners) fn();
 }
 
-const sameText = (a: string, b: string) => fold(a).trim() === fold(b).trim();
+const sameText = sameItem;
 
 /**
  * Añade a la lista. Lo que ya estaba no se duplica: si estaba en el carro vuelve

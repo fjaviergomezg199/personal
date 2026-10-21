@@ -10,6 +10,7 @@ import { addDays, capitalize, formatLong, formatRelative, formatShort, greeting,
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { currentPeriod, daysLeft, eur, eurInt, occurrencesIn, payDue, summarizePeriod } from '../lib/finance';
 import { sumMacros } from '../lib/foods';
+import { HabitsToday } from '../modules/HabitsModule';
 import { MovementSheet } from '../sheets/MovementSheet';
 import type { TodaySection } from '../store/types';
 import { resolveLayout } from '../lib/todayLayout';
@@ -98,7 +99,7 @@ export function Today() {
       </div>
     ),
     week: null,
-    habits: null,
+    habits: <HabitsToday today={today} />,
     menu: menus.map(({ area, meals }) => (
       <div className="section" key={area.id}>
         <SectionHead

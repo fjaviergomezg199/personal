@@ -72,7 +72,8 @@ export type ModuleKey =
   | 'diary'
   | 'metrics'
   | 'money'
-  | 'jointMoney';
+  | 'jointMoney'
+  | 'habits';
 export type TemplateKey = 'studies' | 'running' | 'gym' | 'nutrition' | 'work' | 'home' | 'money' | 'custom';
 export type AreaColor = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
 
@@ -248,6 +249,23 @@ export interface MetricEntry {
   note?: string;
 }
 
+/* ---------- Hábitos ---------- */
+
+export interface Habit {
+  id: ID;
+  name: string;
+  emoji: string;
+  /** Días en que toca (0 = lunes … 6 = domingo). Vacío = todos los días. */
+  days: number[];
+  /** Veces al día (8 vasos de agua). 1 = hecho o no. */
+  target: number;
+  unit?: string;
+  color: AreaColor;
+  order: number;
+  archived?: boolean;
+  createdAt: string;
+}
+
 /* ---------- Finanzas ---------- */
 
 /** «personal»: solo en este móvil. «hogar»: la cuenta conjunta, compartida entre los dos. */
@@ -379,7 +397,7 @@ export interface Settings {
 }
 
 export interface AppState {
-  version: 3;
+  version: 4;
   settings: Settings;
   entries: Entry[];
   birthdays: Birthday[];
@@ -403,4 +421,7 @@ export interface AppState {
   metricTypes: MetricType[];
   metrics: MetricEntry[];
   finance: FinanceState;
+  habits: Habit[];
+  /** Hábito → día → veces hecho. */
+  habitLog: Record<ID, Record<ISODate, number>>;
 }

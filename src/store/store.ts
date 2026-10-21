@@ -6,7 +6,7 @@ import { DEFAULT_MEALS } from '../lib/importers';
 import { files, kv } from './db';
 import { templateInfo } from './templates';
 import type {
-  AppState, Area, Birthday, CustomFood, DocMeta, Entry, FinAccount, FinanceState, FinScope, FoodLogItem, Goal, GoogleCalendarInfo,
+  AppState, Area, Birthday, Habit, CustomFood, DocMeta, Entry, FinAccount, FinanceState, FinScope, FoodLogItem, Goal, GoogleCalendarInfo,
   GoogleEvent, GoogleSettings, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
   NutritionTargets, PlanItem, Recurring, Settings, ShareConfig, TemplateKey,
 } from './types';
@@ -43,7 +43,7 @@ function normalizeFinance(raw: Partial<FinanceState> | undefined): FinanceState 
 
 export function createInitialState(): AppState {
   return {
-    version: 3,
+    version: 4,
     settings: {
       name: '',
       theme: 'auto',
@@ -78,6 +78,8 @@ export function createInitialState(): AppState {
     metricTypes: DEFAULT_METRICS.map((m) => ({ ...m })),
     metrics: [],
     finance: emptyFinance(),
+    habits: [],
+    habitLog: {},
   };
 }
 
@@ -91,7 +93,7 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
   const s: AppState = {
     ...base,
     ...raw,
-    version: 3,
+    version: 4,
     settings,
     entries: (raw.entries ?? []).map((e) => ({ repeat: 'none', alert: null, ...(e as Partial<Entry>) }) as Entry),
     birthdays: raw.birthdays ?? [],
@@ -111,6 +113,8 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
     metricTypes: raw.metricTypes?.length ? raw.metricTypes : DEFAULT_METRICS.map((m) => ({ ...m })),
     metrics: raw.metrics ?? [],
     finance: normalizeFinance(raw.finance),
+    habits: raw.habits ?? [],
+    habitLog: raw.habitLog ?? {},
   };
   if ((raw.version ?? 1) < 2) migrateToV2(s);
   if ((raw.version ?? 1) < 3) migrateToV3(s);
@@ -958,5 +962,59 @@ export function applyFinanceSync(next: Pick<FinanceState, 'movements' | 'recurri
     s.finance.accounts.hogar = next.hogar;
     s.finance.pending = next.pending;
     if (s.share) s.share = { ...s.share, ...sharePatch };
+  }, { silent: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Hábitos                                                              */
+/* ------------------------------------------------------------------ */
+
+export type HabitInput = Omit<Habit, 'id' | 'createdAt' | 'order'> & { id?: ID };
+
+export function saveHabit(input: HabitInput): ID {
+  const id = input.id ?? `H${uid()}`;
+  update((s) => {
+    const i = s.habits.findIndex((h) => h.id === id);
+    if (i >= 0) s.habits[i] = { ...s.habits[i], ...input, id };
+    else s.habits.push({ ...input, id, createdAt: nowIso(), order: s.habits.length });
+  }, { silent: true });
+  return id;
+}
+
+export function deleteHabit(id: ID) {
+  update((s) => {
+    s.habits = s.habits.filter((h) => h.id !== id);
+    delete s.habitLog[id];
+  }, { silent: true });
+}
+
+export function restoreHabit(h: Habit, log: Record<ISODate, number> | undefined) {
+  update((s) => {
+    if (!s.habits.some((x) => x.id === h.id)) s.habits.push(h);
+    if (log) s.habitLog[h.id] = log;
+  }, { silent: true });
+}
+
+/** Cuántas veces se ha hecho un hábito un día (0 lo borra). */
+export function setHabitCount(id: ID, date: ISODate, count: number) {
+  update((s) => {
+    const log = { ...(s.habitLog[id] ?? {}) };
+    if (count > 0) log[date] = count;
+    else delete log[date];
+    s.habitLog[id] = log;
+  }, { silent: true });
+}
+
+export function moveHabit(id: ID, delta: number) {
+  update((s) => {
+    const list = [...s.habits].sort((a, b) => a.order - b.order);
+    const i = list.findIndex((h) => h.id === id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    list.forEach((h, k) => {
+      const t = s.habits.find((x) => x.id === h.id);
+      if (t) t.order = k;
+    });
   }, { silent: true });
 }

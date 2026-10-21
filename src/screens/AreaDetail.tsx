@@ -5,6 +5,7 @@ import { navigate, useRoute } from '../lib/router';
 import { DiaryModule } from '../modules/DiaryModule';
 import { DocsModule } from '../modules/DocsModule';
 import { FinanceModule } from '../modules/FinanceModule';
+import { HabitsModule } from '../modules/HabitsModule';
 import { GoalsModule } from '../modules/GoalsModule';
 import { LiftsModule } from '../modules/LiftsModule';
 import { ListModule } from '../modules/ListModule';
@@ -93,6 +94,7 @@ export function AreaDetail({ id }: { id: string }) {
       {current === 'metrics' && <MetricsModule area={area} />}
       {current === 'money' && <FinanceModule area={area} scope="personal" />}
       {current === 'jointMoney' && <FinanceModule area={area} scope="hogar" />}
+      {current === 'habits' && <HabitsModule />}
 
       {settings && <AreaSettingsSheet area={area} onClose={() => setSettings(false)} />}
     </div>

@@ -767,3 +767,5 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .search-bar { display: flex; align-items: center; gap: 8px; background: var(--bg-elev); border-radius: 14px; box-shadow: var(--shadow); padding: 4px 8px 4px 14px; margin-top: 6px; }
 .search-bar input { border: 0; outline: none; background: none; min-height: 46px; font-size: calc(17px * var(--fs)); min-width: 0; }
 .search-bar input::-webkit-search-cancel-button { display: none; }
+
+.mini-select { min-height: 32px; padding: 4px 28px 4px 8px; font-size: calc(13px * var(--fs)); margin-top: 6px; width: auto; max-width: 100%; background-position: right 8px center; }

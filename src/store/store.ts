@@ -860,6 +860,37 @@ export function addMovement(input: MovementInput): ID {
   return id;
 }
 
+/** Varios de golpe (al importar del banco). */
+export function addMovements(inputs: MovementInput[]): ID[] {
+  const ids: ID[] = [];
+  const shared = inputs.some((i) => i.scope === 'hogar');
+  finUpdate((s) => {
+    const t = Date.now();
+    for (const input of inputs) {
+      const id = `M${uid()}`;
+      ids.push(id);
+      s.finance.movements.push({ ...input, id, updatedAt: t, by: me() });
+      finShared(s, input.scope, `m:${id}`);
+    }
+  }, shared);
+  return ids;
+}
+
+/** Deshacer una importación. */
+export function deleteMovements(ids: ID[]) {
+  const set = new Set(ids);
+  const shared = state.finance.movements.some((m) => set.has(m.id) && m.scope === 'hogar');
+  finUpdate((s) => {
+    const t = Date.now();
+    s.finance.movements = s.finance.movements.flatMap((m) => {
+      if (!set.has(m.id)) return [m];
+      if (m.scope !== 'hogar') return [];
+      finShared(s, 'hogar', `m:${m.id}`);
+      return [{ ...m, deleted: true, updatedAt: t, by: me() }];
+    });
+  }, shared);
+}
+
 export function updateMovement(id: ID, patch: Partial<MovementInput>) {
   const scope = state.finance.movements.find((m) => m.id === id)?.scope;
   finUpdate((s) => {

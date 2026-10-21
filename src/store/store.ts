@@ -363,6 +363,7 @@ export function toggleEntryDone(id: ID, date?: ISODate) {
       e.doneDates = [...set].filter((d) => d >= limit).sort();
     } else {
       e.done = !e.done;
+      e.doneAt = e.done ? nowIso() : undefined;
       e.dirty = true; // quita el aviso en Google si ya está hecho
     }
     e.updatedAt = nowIso();

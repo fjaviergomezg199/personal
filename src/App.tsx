@@ -18,6 +18,7 @@ import { Onboarding } from './screens/Onboarding';
 import { Search } from './screens/Search';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
+import { Week } from './screens/Week';
 import { DriveRestoreHost } from './sheets/DriveRestoreSheet';
 import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
 import type { Settings as SettingsT } from './store/types';
@@ -55,6 +56,7 @@ export function App() {
   else if (section === 'areas') screen = <Areas />;
   else if (section === 'ajustes') screen = <Settings />;
   else if (section === 'buscar') screen = <Search />;
+  else if (section === 'semana') screen = <Week />;
   else screen = <Today />;
 
   return (

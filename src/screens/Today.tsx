@@ -18,6 +18,7 @@ import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
 import { getState, useApp } from '../store/store';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
+import { WeekCard } from './Week';
 
 export function Today() {
   const state = useApp();
@@ -112,7 +113,7 @@ export function Today() {
         )}
       </div>
     ),
-    week: null,
+    week: <WeekCard today={today} />,
     habits: <HabitsToday today={today} />,
     menu: menus.map(({ area, meals }) => (
       <div className="section" key={area.id}>

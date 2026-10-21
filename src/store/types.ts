@@ -34,6 +34,8 @@ export interface Entry {
   areaId?: ID;
   category?: string;
   done?: boolean;
+  /** Cuándo se marcó como hecho (para el resumen de la semana). */
+  doneAt?: string;
   /** Ocurrencias completadas de un elemento repetido. */
   doneDates?: ISODate[];
   important?: boolean;
@@ -408,6 +410,8 @@ export interface Settings {
   emoji?: string;
   /** Orden y visibilidad de los bloques de Hoy. */
   todayLayout?: { key: TodaySection; hidden?: boolean }[];
+  /** Semana (su lunes) cuyo resumen ya se cerró en Hoy. */
+  weekCardClosed?: ISODate;
   /** Aviso por defecto para elementos con hora (minutos). */
   defaultAlert: number | null;
   /** Aviso de cumpleaños (minutos antes de las 00:00 del día). */

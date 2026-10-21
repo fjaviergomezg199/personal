@@ -127,7 +127,10 @@ function TodayLayoutSheet({ onClose }: { onClose: () => void }) {
           return (
             <div key={l.key} className={`layout-row ${l.hidden ? 'off' : ''}`}>
               <span aria-hidden>{meta.emoji}</span>
-              <span className="grow">{meta.label}</span>
+              <span className="grow">
+                {meta.label}
+                {meta.hint && <span className="tiny muted"> · {meta.hint}</span>}
+              </span>
               <button className="icon-btn small plain" aria-label={`Subir ${meta.label}`} disabled={i === 0} onClick={() => move(i, -1)}>
                 <ArrowUp size={16} />
               </button>

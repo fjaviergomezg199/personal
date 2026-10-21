@@ -103,6 +103,15 @@ export function weekKey(iso: ISODate): string {
   return `${thursday.getFullYear()}-W${pad(week)}`;
 }
 
+/** «19 – 25 oct», «28 sep – 4 oct» (semana que empieza en `start`). */
+export function formatWeek(start: ISODate): string {
+  const s = parseISODate(start);
+  const e = parseISODate(addDays(start, 6));
+  return s.getMonth() === e.getMonth()
+    ? `${s.getDate()} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`
+    : `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
+}
+
 export function monthKey(iso: ISODate): string {
   return iso.slice(0, 7);
 }

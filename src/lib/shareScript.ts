@@ -151,8 +151,9 @@ function leerRegistros_(filas, desde) {
 }
 
 function guardarRegistros_(hoja, lista, ahora) {
+  const ancho = hoja.getLastColumn();
+  if (!ancho || !esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) return;
   const filas = hoja.getDataRange().getValues();
-  if (!filas.length || !esRegistro_(filas[0])) return;
   const cab = filas[0].map(String);
   // Datos nuevos de una versión nueva de la app: columnas al final.
   let nuevas = false;
@@ -197,10 +198,13 @@ function todo_(desde) {
   const registros = {};
   const hojas = SpreadsheetApp.getActiveSpreadsheet().getSheets();
   for (let h = 0; h < hojas.length; h++) {
-    const nombre = hojas[h].getName();
+    const hoja = hojas[h];
+    const nombre = hoja.getName();
     if (nombre === HOJA || !NOMBRE.test(nombre)) continue;
-    const filas = hojas[h].getDataRange().getValues();
-    if (filas.length && esRegistro_(filas[0])) registros[nombre] = leerRegistros_(filas, desde);
+    // Primero solo la cabecera: las pestañas que no son de la app no se leen enteras.
+    const ancho = hoja.getLastColumn();
+    if (!ancho || !esRegistro_(hoja.getRange(1, 1, 1, ancho).getValues()[0])) continue;
+    registros[nombre] = leerRegistros_(hoja.getDataRange().getValues(), desde);
   }
   for (const nombre in REGISTROS) if (!registros[nombre]) registros[nombre] = [];
   return { ok: true, version: VERSION, items: leer_(hoja_()), registros: registros, ahora: Date.now() };

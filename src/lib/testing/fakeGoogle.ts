@@ -7,17 +7,28 @@ type Cell = string | number | boolean;
 export function fakeGoogle(key = 'CLAVE123') {
   const sheets: Record<string, Cell[][]> = {};
   const formats: string[] = [];
+  /** Cuántas veces se ha leído cada pestaña entera. */
+  const reads: Record<string, number> = {};
   let calls = 0;
   // Como en Sheets: el apóstrofo inicial solo evita fórmulas, no se guarda.
   const clean = (row: Cell[]) => row.map((v) => (typeof v === 'string' && v.startsWith("'") ? v.slice(1) : v));
   const sheet = (name: string) => ({
     getName: () => name,
     appendRow: (row: Cell[]) => void sheets[name].push(clean(row)),
-    getDataRange: () => ({ getValues: () => sheets[name].map((r) => [...r]) }),
-    getRange: (a: string | number, _col?: number) =>
+    getDataRange: () => ({
+      getValues: () => {
+        reads[name] = (reads[name] ?? 0) + 1;
+        return sheets[name].map((r) => [...r]);
+      },
+    }),
+    getLastColumn: () => Math.max(0, ...sheets[name].map((r) => r.length)),
+    getRange: (a: string | number, _col?: number, rows = 1, cols = 1) =>
       typeof a === 'string'
         ? { setNumberFormat: (f: string) => void formats.push(`${a}=${f}`) }
-        : { setValues: (vals: Cell[][]) => void (sheets[name][a - 1] = clean(vals[0])) },
+        : {
+            setValues: (vals: Cell[][]) => void (sheets[name][a - 1] = clean(vals[0])),
+            getValues: () => sheets[name].slice(a - 1, a - 1 + rows).map((r) => Array.from({ length: cols }, (_, i) => r[i] ?? '')),
+          },
     setFrozenRows: () => undefined,
     deleteRow: (row: number) => void sheets[name].splice(row - 1, 1),
   });
@@ -54,5 +65,5 @@ export function fakeGoogle(key = 'CLAVE123') {
         : fns.doGet({ parameter: Object.fromEntries(new URL(url).searchParams) });
     return new Response(out.getContent(), { status: 200 });
   };
-  return { sheets, formats, fetchImpl, share: { url: URL_, key }, calls: () => calls };
+  return { sheets, formats, reads, fetchImpl, share: { url: URL_, key }, calls: () => calls };
 }

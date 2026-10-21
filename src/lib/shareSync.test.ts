@@ -115,6 +115,8 @@ describe('hojas de registros (código de la hoja v4)', () => {
     g.sheets.Notas = [['Fecha', 'Qué'], ['1/10', 'Mis cosas']];
     await exchange(g.share, [], { Lista: [{ id: 'x', actualizado: '1' }], Notas: [{ id: 'N1', actualizado: '1' }], hola: [{ id: 'h' }] } as never, 0, g.fetchImpl);
     expect(g.sheets.Notas).toEqual([['Fecha', 'Qué'], ['1/10', 'Mis cosas']]);
+    // Solo se mira su cabecera, no se lee entera
+    expect(g.reads.Notas).toBeUndefined();
     expect(g.sheets.Lista).toEqual([['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado']]);
     expect(Object.keys(g.sheets).sort()).toEqual(['Lista', 'Notas']);
   });

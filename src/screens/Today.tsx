@@ -2,21 +2,22 @@ import { Plus, RefreshCw, Search } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AgendaRow, EntryRow } from '../components/AgendaRow';
 import { DayView } from '../components/DayView';
-import { MacroSummary } from '../components/MacroSummary';
 import { GoalRow } from '../components/GoalRow';
 import { openSheet } from '../components/sheets';
-import { Empty, SectionHead } from '../components/ui';
+import { Empty, SectionHead, toast } from '../components/ui';
 import { addDays, capitalize, formatLong, formatRelative, formatShort, greeting, toISODate } from '../lib/dates';
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { currentPeriod, daysLeft, eur, eurInt, occurrencesIn, payDue, summarizePeriod } from '../lib/finance';
-import { sumMacros } from '../lib/foods';
+import { mealForNow, mealsForDay, menuMealItems } from '../lib/diary';
+import { macrosFor, sumMacros } from '../lib/foods';
 import { HabitsToday } from '../modules/HabitsModule';
+import { AddFoodSheet } from '../sheets/AddFoodSheet';
 import { MovementSheet } from '../sheets/MovementSheet';
-import type { ModuleKey, TodaySection } from '../store/types';
+import type { Area, ModuleKey, TodaySection } from '../store/types';
 import { resolveLayout } from '../lib/todayLayout';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
-import { getState, useApp } from '../store/store';
+import { addFoodLog, deleteFoodLog, getState, updateEntry, useApp } from '../store/store';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
 import { WeekCard } from './Week';
 
@@ -98,43 +99,61 @@ export function Today() {
       </div>
     ),
     shopping: <ShoppingPeek />,
+    // Sin culpa: una línea, y a un toque pasarlo todo a hoy.
     overdue: overdue.length > 0 && (
       <div className="section">
-        <SectionHead title="Se te pasó" count={overdue.length} />
-        <div className="list">
-          {(showAllOverdue ? overdue : overdue.slice(0, 3)).map((e) => (
-            <EntryRow key={e.id} entry={e} area={e.areaId ? areas.get(e.areaId) : undefined} showDate overdue />
-          ))}
-        </div>
-        {overdue.length > 3 && (
-          <button className="link-btn mt8" onClick={() => setShowAllOverdue(!showAllOverdue)}>
-            {showAllOverdue ? 'Ver menos' : `Ver ${overdue.length - 3} más`}
-          </button>
+        {showAllOverdue ? (
+          <>
+            <SectionHead
+              title="De otros días"
+              count={overdue.length}
+              action={
+                <button className="link-btn" onClick={() => moveToToday(overdue.map((e) => e.id), today)}>
+                  Todo a hoy
+                </button>
+              }
+            />
+            <div className="list">
+              {overdue.map((e) => (
+                <EntryRow
+                  key={e.id}
+                  entry={e}
+                  area={e.areaId ? areas.get(e.areaId) : undefined}
+                  showDate
+                  trail={
+                    <button
+                      className="chip mini"
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        moveToToday([e.id], today);
+                      }}
+                    >
+                      A hoy
+                    </button>
+                  }
+                />
+              ))}
+            </div>
+            <button className="link-btn mt8" onClick={() => setShowAllOverdue(false)}>
+              Ver menos
+            </button>
+          </>
+        ) : (
+          <div className="card hstack overdue-line">
+            <div className="grow small" role="button" tabIndex={0} onClick={() => setShowAllOverdue(true)} style={{ minWidth: 0, cursor: 'pointer' }}>
+              <b>{overdue.length === 1 ? 'Te quedó 1 cosa de otro día' : `Te quedaron ${overdue.length} cosas de otros días`}</b>
+              <div className="muted ellipsis">{overdue.map((e) => e.title).join(' · ')}</div>
+            </div>
+            <button className="btn small secondary" onClick={() => moveToToday(overdue.map((e) => e.id), today)}>
+              A hoy
+            </button>
+          </div>
         )}
       </div>
     ),
     week: <WeekCard today={today} />,
     habits: <HabitsToday today={today} />,
-    menu: menus.map(({ area, meals }) => (
-      <div className="section" key={area.id}>
-        <SectionHead
-          title={`${area.emoji} Menú de ${day === today ? 'hoy' : day === addDays(today, 1) ? 'mañana' : formatShort(day)}`}
-          action={
-            <button className="link-btn" onClick={() => navigate(`/areas/${area.id}?bloque=menu`)}>
-              Semana
-            </button>
-          }
-        />
-        <div className={`card tone-${area.color}`}>
-          {meals.map((m) => (
-            <div className="meal" key={m.meal}>
-              <div className="m">{m.meal}</div>
-              <div className="x">{m.text}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )),
+    menu: menus.map(({ area, meals }) => <MenuToday key={area.id} area={area} meals={meals} day={day} today={today} />),
     diary: <MacrosPeek today={today} />,
     money: <FinancePeek today={today} />,
     goals: goals.length > 0 && (
@@ -161,13 +180,13 @@ export function Today() {
         {inbox.length ? (
           <>
             <div className="list">
-              {(showAllInbox ? inbox : inbox.slice(0, 5)).map((e) => (
+              {(showAllInbox ? inbox : inbox.slice(0, 3)).map((e) => (
                 <EntryRow key={e.id} entry={e} />
               ))}
             </div>
-            {inbox.length > 5 && (
+            {inbox.length > 3 && (
               <button className="link-btn mt8" onClick={() => setShowAllInbox(!showAllInbox)}>
-                {showAllInbox ? 'Ver menos' : `Ver ${inbox.length - 5} más`}
+                {showAllInbox ? 'Ver menos' : `Ver ${inbox.length - 3} más`}
               </button>
             )}
           </>
@@ -233,7 +252,17 @@ export function Today() {
         ) : null,
       )}
 
-      {layout.map(({ key, hidden }) => (hidden ? null : <Fragment key={key}>{blocks[key]}</Fragment>))}
+      {groupTiles(layout.filter((l) => !l.hidden).map((l) => l.key)).map((g) =>
+        Array.isArray(g) ? (
+          <div key={g.join('-')} className="tiles">
+            {g.map((k) => (
+              <Fragment key={k}>{blocks[k]}</Fragment>
+            ))}
+          </div>
+        ) : (
+          <Fragment key={g}>{blocks[g]}</Fragment>
+        ),
+      )}
 
       {state.areas.length === 0 && (
         <div className="section">
@@ -256,6 +285,29 @@ export function Today() {
   );
 }
 
+/** Pasar a hoy lo que quedó de otros días (sin hora: es «para hoy»), con deshacer. */
+function moveToToday(ids: string[], today: string) {
+  const before = getState().entries.filter((e) => ids.includes(e.id)).map(({ id, date, time, endTime, alert }) => ({ id, date, time, endTime, alert }));
+  for (const id of ids) updateEntry(id, { date: today, time: undefined, endTime: undefined, alert: null });
+  toast(before.length === 1 ? 'Pasado a hoy' : `${before.length} cosas pasadas a hoy`, {
+    action: 'Deshacer',
+    onAction: () => before.forEach(({ id, ...prev }) => updateEntry(id, prev)),
+  });
+}
+
+/** Bloques que en Hoy son tarjetas pequeñas: si van seguidos, se ponen de dos en dos. */
+const TILES = new Set<TodaySection>(['shopping', 'diary', 'money']);
+
+function groupTiles(keys: TodaySection[]): (TodaySection | TodaySection[])[] {
+  const out: (TodaySection | TodaySection[])[] = [];
+  for (const k of keys) {
+    const last = out[out.length - 1];
+    if (TILES.has(k) && Array.isArray(last)) last.push(k);
+    else out.push(TILES.has(k) ? [k] : k);
+  }
+  return out;
+}
+
 function RefreshHint() {
   const state = useApp();
   if (!state.settings.google.lastSync) return null;
@@ -267,52 +319,172 @@ function RefreshHint() {
   );
 }
 
+/**
+ * El menú en Hoy: la comida que toca (y la siguiente), no el día entero. Con el
+ * diario de comidas, «✓ Comido» la apunta de un toque.
+ */
+function MenuToday({ area, meals, day, today }: { area: Area; meals: { meal: string; text: string }[]; day: string; today: string }) {
+  const state = useApp();
+  const [all, setAll] = useState(false);
+  const [adding, setAdding] = useState<{ meal: string; menuText: string } | null>(null);
+  const isToday = day === today;
+  const canLog = isToday && state.areas.some((a) => a.modules.includes('diary'));
+  const logs = state.foodLog.filter((l) => l.date === today);
+  const logged = (meal: string) => logs.some((l) => l.meal === meal);
+
+  let shown = meals;
+  if (isToday && !all) {
+    // La que toca y la siguiente; y la anterior si aún no se ha apuntado (¿la comiste?)
+    const cur = Math.max(0, meals.findIndex((m) => m.meal === mealForNow(meals.map((x) => x.meal))));
+    const start = canLog && cur > 0 && !logged(meals[cur - 1].meal) ? cur - 1 : cur;
+    shown = meals.slice(start, cur + 2);
+  }
+
+  const eat = (m: { meal: string; text: string }) => {
+    const items = menuMealItems(m.text, state.customFoods);
+    if (!items) return setAdding({ meal: m.meal, menuText: m.text });
+    const ids = addFoodLog(items.map(({ food, grams }) => ({ date: today, meal: m.meal, name: food.name, grams: Math.round(grams), foodId: food.key, ...macrosFor(food, grams) })));
+    const kcal = Math.round(sumMacros(items.map((x) => macrosFor(x.food, x.grams))).kcal);
+    toast(`${m.meal} apuntada · ${kcal.toLocaleString('es-ES')} kcal`, { action: 'Deshacer', onAction: () => deleteFoodLog(ids) });
+  };
+
+  return (
+    <div className="section">
+      <SectionHead
+        title={`${area.emoji} Menú de ${isToday ? 'hoy' : day === addDays(today, 1) ? 'mañana' : formatShort(day)}`}
+        action={
+          <button className="link-btn" onClick={() => navigate(`/areas/${area.id}?bloque=menu`)}>
+            Semana
+          </button>
+        }
+      />
+      <div className={`card tone-${area.color}`}>
+        {shown.map((m) => (
+          <div className="meal meal-today" key={m.meal}>
+            <div className="mt-head">
+              <div className="m">{m.meal}</div>
+              {canLog &&
+                (logged(m.meal) ? (
+                  <span className="badge tone-green">✓ Apuntado</span>
+                ) : (
+                  <button className="chip mini" onClick={() => eat(m)} aria-label={`Apuntar ${m.meal.toLowerCase()} del menú`}>
+                    ✓ Comido
+                  </button>
+                ))}
+            </div>
+            <div className="x">{m.text}</div>
+          </div>
+        ))}
+        {isToday && meals.length > shown.length && (
+          <button className="link-btn mt8" style={{ padding: 0 }} onClick={() => setAll(true)}>
+            Ver todo el día ({meals.length} comidas)
+          </button>
+        )}
+      </div>
+      {adding && (
+        <AddFoodSheet date={today} meal={adding.meal} meals={mealsForDay(meals.map((m) => m.meal), logs)} menuText={adding.menuText} onClose={() => setAdding(null)} />
+      )}
+    </div>
+  );
+}
+
+/** Tarjeta pequeña de Hoy: un dato de un vistazo, un toque para abrirlo y, si se puede, «+» para apuntar. */
+function Tile(props: {
+  emoji: string;
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  /** Parte usada (0–1); más de 1 es pasarse. */
+  meter?: number;
+  tone?: string;
+  onOpen: () => void;
+  onAdd?: () => void;
+  addLabel?: string;
+}) {
+  return (
+    <div
+      className={`tile ${props.tone ? `tone-${props.tone}` : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={props.onOpen}
+      onKeyDown={(e) => e.key === 'Enter' && props.onOpen()}
+    >
+      <div className="tile-head">
+        <span>
+          {props.emoji} {props.label}
+        </span>
+        {props.onAdd && (
+          <button
+            className="tile-add"
+            aria-label={props.addLabel}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onAdd?.();
+            }}
+          >
+            <Plus size={17} />
+          </button>
+        )}
+      </div>
+      <div className="tile-value">{props.value}</div>
+      {props.meter !== undefined && (
+        <div className={`meter ${props.meter > 1 ? 'over' : ''}`} role="img" aria-label={`${Math.round(props.meter * 100)} %`}>
+          <div style={{ width: `${Math.min(100, props.meter * 100)}%` }} />
+        </div>
+      )}
+      {props.sub && <div className="tile-sub">{props.sub}</div>}
+    </div>
+  );
+}
+
 /** La lista de la compra, a mano desde Hoy. */
 function ShoppingPeek() {
   const state = useApp();
   const items = state.listItems.filter((i) => i.list === 'compra' && !i.done && !i.deleted);
   const area = sortedAreas(state).find((a) => a.modules.includes('shopping'));
   if (!items.length || !area) return null;
-  const names = items.slice(0, 4).map((i) => i.text).join(', ');
   return (
-    <button className="card hstack mt12" style={{ width: '100%', textAlign: 'left', border: 0 }} onClick={() => navigate(`/areas/${area.id}?bloque=shopping`)}>
-      <span style={{ fontSize: 'calc(22px * var(--fs))' }}>🛒</span>
-      <div className="grow">
-        <div style={{ fontWeight: 700 }}>
-          Lista de la compra · {items.length}
-          {state.share ? ' · compartida' : ''}
-        </div>
-        <div className="small muted ellipsis">
-          {names}
-          {items.length > 4 ? '…' : ''}
-        </div>
-      </div>
-    </button>
+    <Tile
+      emoji="🛒"
+      label={state.share ? 'Compra (los dos)' : 'Compra'}
+      value={
+        <>
+          {items.length} <small>{items.length === 1 ? 'cosa' : 'cosas'}</small>
+        </>
+      }
+      sub={items.map((i) => i.text).join(', ')}
+      tone={area.color}
+      onOpen={() => navigate(`/areas/${area.id}?bloque=shopping`)}
+    />
   );
 }
 
-/** Calorías y macros de hoy (si se usa el diario de comidas). */
+/** Calorías de hoy (si se usa el diario de comidas). */
 function MacrosPeek({ today }: { today: string }) {
   const state = useApp();
   const area = sortedAreas(state).find((a) => a.showOnToday && a.modules.includes('diary'));
   const logs = state.foodLog.filter((l) => l.date === today);
   const targets = state.nutritionTargets;
   if (!area || (!logs.length && !targets.kcal)) return null;
-  const open = () => navigate(`/areas/${area.id}?bloque=diary`);
+  const kcal = Math.round(sumMacros(logs).kcal);
+  const target = targets.kcal;
   return (
-    <div className="section">
-      <SectionHead
-        title={`${area.emoji} Calorías de hoy`}
-        action={
-          <button className="link-btn" onClick={open}>
-            Apuntar
-          </button>
-        }
-      />
-      <div className={`card tone-${area.color}`} role="button" tabIndex={0} onClick={open} style={{ cursor: 'pointer' }}>
-        <MacroSummary total={sumMacros(logs)} targets={targets} compact />
-      </div>
-    </div>
+    <Tile
+      emoji="🔥"
+      label="Calorías"
+      value={
+        <>
+          {kcal.toLocaleString('es-ES')}
+          {target ? <small> / {target.toLocaleString('es-ES')}</small> : <small> kcal</small>}
+        </>
+      }
+      meter={target ? kcal / target : undefined}
+      sub={target ? (kcal <= target ? `Quedan ${(target - kcal).toLocaleString('es-ES')}` : `${(kcal - target).toLocaleString('es-ES')} de más`) : logs.length ? undefined : 'Nada apuntado'}
+      tone={area.color}
+      onOpen={() => navigate(`/areas/${area.id}?bloque=diary`)}
+      onAdd={() => navigate(`/areas/${area.id}?bloque=diary&nuevo=1`)}
+      addLabel="Apuntar lo que he comido"
+    />
   );
 }
 
@@ -330,43 +502,34 @@ function FinancePeek({ today }: { today: string }) {
   if (!acc.periodStarts.length && !s.movements.length && !soon.length) return null;
   const left = daysLeft(period, today);
   const total = acc.budgetTotal;
-  const over = total !== undefined && s.spent > total;
+  const next = soon[0];
   return (
-    <div className="section">
-      <SectionHead
-        title={`${area.emoji} ${area.name}`}
-        action={
-          <button className="link-btn" onClick={() => setAdding(true)}>
-            + Gasto
-          </button>
+    <>
+      <Tile
+        emoji="💶"
+        label="Gastado"
+        value={
+          <>
+            {eurInt(s.spent)}
+            {total !== undefined && <small> de {eurInt(total)}</small>}
+          </>
         }
+        meter={total ? s.spent / total : undefined}
+        sub={
+          next
+            ? `📆 ${next.date === today ? 'Hoy' : 'Mañana'}: ${next.recurring.name} (${eur(next.amount)})`
+            : payDue(acc, today)
+              ? '¿Has cobrado ya?'
+              : left > 0
+                ? `Quedan ${left} ${left === 1 ? 'día' : 'días'}`
+                : 'Esperando el cobro'
+        }
+        tone={area.color}
+        onOpen={() => navigate(`/areas/${area.id}?bloque=money`)}
+        onAdd={() => setAdding(true)}
+        addLabel="Apuntar un gasto"
       />
-      <div className={`card tone-${area.color}`} role="button" tabIndex={0} onClick={() => navigate(`/areas/${area.id}?bloque=money`)} style={{ cursor: 'pointer' }}>
-        <div className="ms-head">
-          <div>
-            <div className="ms-label">Gastado este periodo</div>
-            <div className="ms-hero" style={{ fontSize: 'calc(28px * var(--fs))' }}>
-              {eurInt(s.spent)}
-              {total !== undefined && <span className="ms-of"> de {eurInt(total)}</span>}
-            </div>
-          </div>
-          <div className="ms-left">
-            {payDue(acc, today) ? '¿Has cobrado ya?' : left > 0 ? `Quedan ${left} ${left === 1 ? 'día' : 'días'}` : 'Esperando el cobro'}
-            {total !== undefined && !over && <div className="tiny">{eurInt(total - s.spent)} libres</div>}
-          </div>
-        </div>
-        {total !== undefined && (
-          <div className={`meter mt8 ${over ? 'over' : ''}`}>
-            <div style={{ width: `${Math.min(100, (s.spent / total) * 100)}%` }} />
-          </div>
-        )}
-        {soon.map((o) => (
-          <div key={`${o.recurring.id}-${o.date}`} className="small muted mt8">
-            📆 {o.date === today ? 'Hoy' : 'Mañana'} se carga {o.recurring.name} ({eur(o.amount)}){o.recurring.scope === 'hogar' ? ', cuenta conjunta' : ''}
-          </div>
-        ))}
-      </div>
       {adding && <MovementSheet scope="personal" kind="gasto" onClose={() => setAdding(false)} />}
-    </div>
+    </>
   );
 }

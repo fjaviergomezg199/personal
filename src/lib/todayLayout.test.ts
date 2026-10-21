@@ -15,11 +15,19 @@ describe('orden de la pantalla Hoy', () => {
       { key: 'money' }, // repetido
       { key: 'nada' as never },
     ]);
-    expect(r.slice(0, 4)).toEqual([
-      { key: 'money', hidden: false },
-      { key: 'dayview', hidden: false },
-      { key: 'shopping', hidden: true },
-      { key: 'overdue', hidden: false }, // nuevo: detrás de «Lista de la compra», como siempre
+    // Lo que no estaba guardado va detrás del bloque que le precede en el orden de siempre
+    expect(r.map((x) => (x.hidden ? `(${x.key})` : x.key))).toEqual([
+      'money',
+      'dayview',
+      'week',
+      'overdue',
+      'habits',
+      'menu',
+      '(shopping)',
+      'diary',
+      'goals',
+      'inbox',
+      'upcoming',
     ]);
     expect(r).toHaveLength(TODAY_SECTIONS.length);
   });

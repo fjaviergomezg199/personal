@@ -1,4 +1,5 @@
 import type { CustomFood, FoodLogItem } from '../store/types';
+import { parseFoodText } from './foodParse';
 import { findFood, type FoodRef } from './foods';
 import { DEFAULT_MEALS } from './importers';
 import { fold } from './quickParse';
@@ -47,6 +48,18 @@ export function menuOptions(text: string): string[] {
         .trim(),
     )
     .filter((l) => l.length > 1);
+}
+
+/**
+ * Lo que lleva una comida del menú, para apuntarla de un toque. null si hay que
+ * elegir (opciones) o si algo no se reconoce: entonces se abre la hoja de apuntar.
+ */
+export function menuMealItems(text: string, custom: CustomFood[]): { food: FoodRef; grams: number }[] | null {
+  if (menuHasAlternatives(text)) return null;
+  const parsed = parseFoodText(menuOptions(text).join('\n'), custom);
+  if (!parsed.length || parsed.some((p) => !p.food)) return null;
+  const items = parsed.filter((p) => p.grams > 0).map((p) => ({ food: p.food!, grams: p.grams }));
+  return items.length ? items : null;
 }
 
 /** ¿Las líneas son opciones a elegir («Opción 1: …») o partes de la misma comida? */

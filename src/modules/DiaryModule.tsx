@@ -1,11 +1,12 @@
 import { ChevronLeft, ChevronRight, ClipboardList, Plus, Repeat2, Target, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MacroSummary } from '../components/MacroSummary';
 import { Sheet, toast } from '../components/ui';
 import { addDays, capitalize, daysBetween, formatLong, weekdayIndex } from '../lib/dates';
 import { mealForNow, mealsForDay, menuOptions } from '../lib/diary';
 import { findFood, macroLine, macrosFor, quickAmounts, scaleMacros, sumMacros } from '../lib/foods';
 import { fmt0, fmt1, parseDecimal, toInput } from '../lib/num';
+import { clearQuery, useRoute } from '../lib/router';
 import { useToday } from '../lib/useToday';
 import { addFoodLog, deleteFoodLog, restoreFoodLog, setNutritionTargets, updateFoodLog, useApp } from '../store/store';
 import type { Area, FoodLogItem, ISODate } from '../store/types';
@@ -27,7 +28,13 @@ export function DiaryModule({ area }: { area: Area }) {
   const [sel, setSel] = useState<{ base: ISODate; date: ISODate } | null>(null);
   const date = sel && sel.base === today ? sel.date : today;
   const setDate = (d: ISODate) => setSel({ base: today, date: d });
-  const [adding, setAdding] = useState<{ meal: string; menuText?: string } | null>(null);
+  const route = useRoute();
+  const [adding, setAdding] = useState<{ meal: string; menuText?: string } | null>(() =>
+    route.query.get('nuevo') ? { meal: mealForNow(mealsForDay(area.menu?.meals, [])) } : null,
+  );
+  useEffect(() => {
+    if (route.query.get('nuevo')) clearQuery('nuevo');
+  }, [route.query]);
   const [editing, setEditing] = useState<FoodLogItem | null>(null);
   const [targetsOpen, setTargetsOpen] = useState(false);
   const [foodsOpen, setFoodsOpen] = useState(false);
@@ -206,7 +213,7 @@ function FoodLogSheet({ item, meals, onClose }: { item: FoodLogItem; meals: stri
           </label>
         </div>
         <div className="grow" style={{ textAlign: 'right', paddingBottom: 4 }}>
-          <div style={{ fontWeight: 750, fontSize: 22 }}>{fmt0(m.kcal)} kcal</div>
+          <div style={{ fontWeight: 750, fontSize: 'calc(22px * var(--fs))' }}>{fmt0(m.kcal)} kcal</div>
           <div className="small muted">{macroLine(m)}</div>
         </div>
       </div>

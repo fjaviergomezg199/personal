@@ -12,7 +12,7 @@ export function GoogleEventSheet({ event: g, onClose }: { event: GoogleEvent; on
       <div className="hstack" style={{ alignItems: 'flex-start' }}>
         <span style={{ width: 14, height: 14, borderRadius: 4, background: g.color ?? 'var(--primary)', marginTop: 7, flexShrink: 0 }} />
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, lineHeight: 1.25 }}>{g.title}</h2>
+          <h2 style={{ margin: 0, fontSize: 'calc(22px * var(--fs))', lineHeight: 1.25 }}>{g.title}</h2>
           <div className="muted mt8">
             {capitalize(formatLong(g.date))}
             {g.endDate ? ` – ${formatLong(g.endDate)}` : ''}

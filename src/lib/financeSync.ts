@@ -9,10 +9,12 @@ import { isISODate } from './dates';
 
 export type Row = Record<string, string>;
 
+/** Lo que va a las hojas de registros (una pestaña por tipo). */
 export interface SharedRecords {
   Movimientos?: Row[];
   Fijos?: Row[];
   Cuenta?: Row[];
+  Planes?: Row[];
 }
 
 const yes = (v: string | undefined) => v === 'true' || v === 'TRUE';
@@ -125,7 +127,7 @@ function applyPart(a: FinAccount, part: Part, raw: string): FinAccount {
 /** Lo pendiente de enviar, y con qué versión se envía cada cosa. */
 export function financeOutbox(fin: FinanceState, by?: string): { records: SharedRecords; sent: Map<string, number> } {
   const sent = new Map<string, number>();
-  const records: Required<SharedRecords> = { Movimientos: [], Fijos: [], Cuenta: [] };
+  const records: Required<Pick<SharedRecords, 'Movimientos' | 'Fijos' | 'Cuenta'>> = { Movimientos: [], Fijos: [], Cuenta: [] };
   for (const key of fin.pending) {
     const [type, id] = [key.slice(0, 1), key.slice(2)];
     if (type === 'm') {
@@ -161,7 +163,8 @@ function versionOf(fin: FinanceState, key: string): number | undefined {
 /**
  * Une lo que dice la hoja con lo de este móvil. Lo pendiente y más nuevo de aquí
  * se respeta. Con `full` la hoja trae todo, así que lo que no venga (y no esté
- * pendiente) es que ya no existe.
+ * pendiente) es que ya no existe. Si la hoja no trae un tipo (no tiene su pestaña,
+ * o no la ha podido usar), lo de aquí se queda tal cual y se vuelve a enviar.
  */
 export function mergeFinance(
   cur: FinanceState,
@@ -169,8 +172,14 @@ export function mergeFinance(
   server: SharedRecords,
   full: boolean,
 ): Pick<FinanceState, 'movements' | 'recurring' | 'pending'> & { hogar: FinAccount } {
-  // Lo enviado que no ha vuelto a cambiar aquí ya está en la hoja.
-  const pending = new Set(cur.pending.filter((k) => !(sent.has(k) && (sent.get(k) === -1 || versionOf(cur, k) === sent.get(k)))));
+  const known: Record<string, boolean> = { m: !!server.Movimientos, f: !!server.Fijos, c: !!server.Cuenta };
+  // Lo enviado que no ha vuelto a cambiar aquí ya está en la hoja (si la hoja lo ha guardado).
+  const pending = new Set(
+    cur.pending.filter((k) => !(sent.get(k) === -1 || (known[k.slice(0, 1)] && sent.has(k) && versionOf(cur, k) === sent.get(k)))),
+  );
+  for (const m of cur.movements) if (!known.m && m.scope === 'hogar') pending.add(`m:${m.id}`);
+  for (const f of cur.recurring) if (!known.f && f.scope === 'hogar') pending.add(`f:${f.id}`);
+  if (!known.c) for (const part of PARTS) if (cur.accounts.hogar.stamps[part]) pending.add(`c:${part}`);
   const keep = <T extends { id: string; updatedAt: number; scope: string }>(local: T[], incoming: T[], prefix: string): T[] => {
     const byId = new Map(incoming.map((x) => [x.id, x]));
     const out: T[] = [];
@@ -195,8 +204,8 @@ export function mergeFinance(
     for (const s of incoming) if (!seen.has(s.id)) out.push(s);
     return out;
   };
-  const movements = keep(cur.movements, (server.Movimientos ?? []).map(rowToMovement).filter((m): m is Movement => !!m), 'm');
-  const recurring = keep(cur.recurring, (server.Fijos ?? []).map(rowToRecurring).filter((f): f is Recurring => !!f), 'f');
+  const movements = known.m ? keep(cur.movements, server.Movimientos!.map(rowToMovement).filter((m): m is Movement => !!m), 'm') : cur.movements;
+  const recurring = known.f ? keep(cur.recurring, server.Fijos!.map(rowToRecurring).filter((f): f is Recurring => !!f), 'f') : cur.recurring;
 
   let hogar = cur.accounts.hogar;
   for (const row of server.Cuenta ?? []) {

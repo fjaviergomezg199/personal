@@ -10,11 +10,11 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 
 | Pantalla | Para qué |
 |---|---|
-| **Hoy** | **Día a vista**: hoy (o mañana) por horas, con lo que tiene hora en su sitio, lo del día aparte y una línea roja en la hora actual; toca una hora libre para apuntar algo a esa hora. Debajo: lista de la compra, menú del día, calorías de hoy, objetivos, pendientes, cumpleaños y lo que viene. |
-| **Agenda** | Tu semana día a día, la lista de lo próximo (3 meses) y los cumpleaños con cuántos años cumplen. |
+| **Hoy** | **Día a vista**: hoy (o mañana) por horas, con lo que tiene hora en su sitio, lo del día aparte y una línea roja en la hora actual; toca una hora libre para apuntar algo a esa hora. Debajo: lista de la compra, hábitos, menú del día, calorías de hoy, finanzas, objetivos, pendientes, cumpleaños y lo que viene; el domingo y el lunes, **el resumen de tu semana**. Los bloques se ordenan y se ocultan a tu gusto. La 🔍 busca en todo. |
+| **Agenda** | Tu semana día a día, la lista de lo próximo (3 meses) y los cumpleaños con cuántos años cumplen. El 📊 abre el resumen de la semana. |
 | **＋** | Añadir escribiendo como hablas (ver abajo). |
 | **Áreas** | Cada parte de tu vida con sus bloques. Se añaden y se quitan cuando quieras. |
-| **Ajustes** | Avisos, Google Calendar, copia de seguridad, tema claro/oscuro. |
+| **Ajustes** | Avisos, Google Calendar, hogar compartido, copia de seguridad (también automática en Google Drive) y apariencia: color, fondo, tamaño de letra, tema claro/oscuro. |
 
 ### Añadir en una frase
 
@@ -25,6 +25,23 @@ Pulsa **＋** y escribe, la app entiende la fecha, la hora, si se repite y de qu
 - `entradas Rosalía viernes 10:00` → recordatorio con aviso 10 min antes (y puedes guardar el enlace de la web de entradas)
 - `todos los lunes 9:00 reunión academia` → se repite cada semana
 - `pagar el alquiler el día 1 de cada mes`, `en 20 minutos sacar la ropa`, `esta tarde llamar a mamá`, `comprar pan`…
+- `cena con Leyre el sábado a las 21:30` → si compartís el hogar, se marca solo como **plan en pareja** (ver abajo)
+
+### Planes en pareja
+
+Cualquier plan, recordatorio o tarea se puede compartir con un interruptor: **«👥 Compartir con…»** (sale si tenéis el hogar compartido). Al otro le aparece en su agenda (y en su Google Calendar, si lo tiene conectado) con la etiqueta «👥 Con Leyre»; si uno cambia la hora o el sitio, le cambia al otro; si uno lo borra, se borra para los dos (con «Deshacer»). Cada uno conserva su propio aviso y su área. Si al escribir nombras a tu pareja («cine con Javi»), o pones «en pareja» o «juntos», el interruptor ya sale encendido.
+
+### Hábitos
+
+Beber agua, leer, estirar… cada uno con los días en que toca y cuántas veces al día (8 vasos de agua). En *Hoy* se marcan con un toque, con la **racha** 🔥 de días seguidos; en el hábito ves las últimas semanas en cuadritos y tu mejor racha.
+
+### Resumen de la semana
+
+El domingo (y el lunes, la semana que acabó) sale en *Hoy* **«Tu semana»**: lo que has hecho, los planes, las sesiones de cada área (estudio, entrenos), el % de hábitos cumplidos, lo gastado frente a la semana anterior y el peso. Al tocarlo se abre el resumen completo, con los hábitos día a día, gastos por categoría, calorías medias, objetivos de la semana, la compra y **lo que viene la semana siguiente**. Se puede ver cualquier semana desde *Agenda → 📊*.
+
+### Buscar y atajos
+
+La 🔍 de *Hoy* busca en todo: planes y recordatorios, cumpleaños, sesiones, notas y objetivos, documentos, la compra, gastos, lo que has comido y hábitos (sin preocuparte de tildes). Y manteniendo pulsado el icono de la app salen atajos: **Añadir**, **Gasto**, **Compra**, **Comida** y **Buscar**.
 
 ### Áreas y sus bloques
 
@@ -33,7 +50,7 @@ Plantillas listas para usar (se pueden cambiar los bloques de cada área):
 - 📚 **Estudios** (p. ej. Historia del Arte): plan de estudio día a día, entregas y exámenes, documentos (PDF y artefactos de Claude), objetivos y notas.
 - 🏃 **Running**: entrenamientos sesión a sesión, con lo que has hecho («6,2 km en 37:10»).
 - 🏋️ **CrossFit**: pega el WOD del box y, con tus **RM** apuntados, la app pone los kilos al lado de cada porcentaje: `Deadlift 4x3 @80%` → **112,5 kg**. Tabla de porcentajes y discos por lado.
-- 🥗 **Nutrición**: menú semanal (lo de hoy sale en Hoy), **calorías y macros** de lo que comes, **peso y medidas** con su gráfica, indicaciones de la nutri y lista de la compra.
+- 🥗 **Nutrición**: menú semanal (lo de hoy sale en Hoy), **calorías y macros** de lo que comes, **peso y medidas** con su gráfica, indicaciones de la nutri y lista de la compra. **Del menú a la compra**: un botón suma lo que lleva el menú de los días que elijas (lo cocinado, en crudo: «80 g de arroz cocido» cuenta como arroz) y lo pasa a la lista, ordenado por secciones del súper y sin repetir lo que ya está.
 - 💼 **Trabajo** (Academia, Ministerio…): pendientes, objetivos de la semana, notas y documentos.
 - 🏠 **Hogar**: lista de la compra (ordenada por secciones del súper), tareas de casa y la cuenta conjunta, **compartidas entre los dos móviles**.
 - 💶 **Finanzas**: «Mis finanzas» (solo en tu móvil) y la «Cuenta conjunta» (compartida), con periodos que van de cobro a cobro.
@@ -58,6 +75,7 @@ En *Finanzas* hay dos bloques: **Mis finanzas** (tus gastos e ingresos; no salen
 - **Objetivos de gasto** por categoría (ocio, restaurantes…) y un total del periodo, con lo que queda y cuánto puedes gastar al día hasta cobrar. Si te pasas, avisa.
 - **Fijos**: hipoteca, luz, comunidad, gimnasio, IBI (mensuales, cada 2, 3, 6 meses o anuales). Cuentan solos en cada periodo, con lo que falta por cargar; si un mes llega otra cantidad (la luz), se pone la real, y si un mes no hay cargo, se salta.
 - **En qué se va** el dinero por categorías, los movimientos día a día y los periodos anteriores para comparar.
+- **Importar del banco**: descarga los movimientos en la web o la app del banco (Excel o CSV) y ábrelos en *Finanzas → Importar movimientos del banco*, o copia las filas y pégalas. La app reconoce las columnas de fecha, concepto e importe, adivina la categoría y deja sin marcar lo que ya tenías apuntado. El fichero se lee en el móvil: no se envía a ningún sitio.
 - En *Hoy* sale lo gastado en el periodo y los fijos que se cargan hoy o mañana.
 
 ### Peso y medidas
@@ -93,7 +111,7 @@ La primera vez pregunta el nombre y qué áreas quieres. Cada uno tendrá su app
 
 ### 3. Hogar compartido: la misma lista de la compra en los dos móviles (opcional)
 
-La lista de la compra, las tareas de casa y la **cuenta conjunta** se pueden compartir: lo que uno apunta, al otro le aparece (y lo que se marca en el súper, también). Se guardan en una **hoja de cálculo de Google vuestra**, sin servidores de nadie más. Lo configura uno de los dos, una vez (~3 minutos, mejor desde el ordenador):
+La lista de la compra, las tareas de casa, la **cuenta conjunta** y los **planes en pareja** se pueden compartir: lo que uno apunta, al otro le aparece (y lo que se marca en el súper, también). Se guardan en una **hoja de cálculo de Google vuestra**, sin servidores de nadie más. Lo configura uno de los dos, una vez (~3 minutos, mejor desde el ordenador):
 
 1. En la app: *Ajustes → Configurar hogar compartido → Configurarlo yo*. Ahí están los pasos y el código, con vuestra clave ya puesta.
 2. Abrir [sheets.new](https://sheets.new) → *Extensiones → Apps Script* → pegar el código → Guardar.
@@ -103,7 +121,9 @@ La lista de la compra, las tareas de casa y la **cuenta conjunta** se pueden com
 
 Cada móvil se actualiza al abrir la app, al volver a ella y cada 30 segundos mientras está abierta; sin conexión se apunta igual y se envía al volver internet. Si los dos cambiáis lo mismo a la vez, gana el último cambio.
 
-**Si configurasteis la hoja antes de que hubiera finanzas** (código «versión 2»), la lista sigue funcionando, pero para compartir la cuenta conjunta hay que poner el código nuevo: *Ajustes → Código para tu pareja y opciones → Actualiza el código de la hoja*. Se pega en Apps Script y se hace *Implementar → Gestionar implementaciones → ✏️ → Nueva versión*; la dirección `/exec` no cambia, así que no hay que tocar nada en los móviles.
+La app usa en la hoja las pestañas «Lista», «Movimientos», «Fijos», «Cuenta» y «Planes». Podéis añadir otras vuestras sin problema; si ya teníais una con alguno de esos nombres, la app no la toca y avisa para que le cambiéis el nombre (mientras, lo de esa pestaña se queda guardado en el móvil).
+
+**Si configurasteis la hoja con una versión anterior** (código «versión 2» o «versión 3»), lo que ya compartíais sigue funcionando, pero para compartir los planes en pareja (y la cuenta conjunta, si era la 2) hay que poner el código nuevo, la **versión 4**: *Ajustes → Código para tu pareja y opciones → Actualiza el código de la hoja*. Se pega en Apps Script y se hace *Implementar → Gestionar implementaciones → ✏️ → Nueva versión*; la dirección `/exec` no cambia, así que no hay que tocar nada en los móviles. Lo que apuntéis mientras tanto como «en pareja» se envía solo en cuanto esté puesto. La versión 4 guarda también cualquier cosa nueva que la app comparta en el futuro, así que **no habrá que volver a cambiarlo**.
 
 ### 4. Conectar Google Calendar (opcional, recomendado)
 
@@ -111,7 +131,7 @@ Sirve para ver vuestros eventos de Google en la agenda y, sobre todo, para que *
 
 Se hace una sola vez en [Google Cloud Console](https://console.cloud.google.com) (~5 minutos; los pasos también están dentro de la app, en *Ajustes → Google Calendar*, con las direcciones exactas para copiar):
 
-1. Crear un proyecto (p. ej. «Día a Día») y **habilitar Google Calendar API**.
+1. Crear un proyecto (p. ej. «Día a Día») y **habilitar Google Calendar API** y **Google Drive API** (esta última, para la copia automática).
 2. **Google Auth Platform → Comenzar**: nombre de la app, vuestro correo, tipo *Externo*.
 3. **Público → Publicar app** (pasar a producción). Así el permiso no caduca cada 7 días. No hace falta verificarla: al conectar, Google avisa de que no está verificada → *Configuración avanzada* → *Ir a Día a Día*.
 4. **Clientes → Crear cliente → Aplicación web** con:
@@ -122,6 +142,13 @@ Se hace una sola vez en [Google Cloud Console](https://console.cloud.google.com)
    Opcional: guardarlo como variable `VITE_GOOGLE_CLIENT_ID` del repositorio (*Settings → Secrets and variables → Actions → Variables*) y la app ya vendrá configurada.
 
 > Google da permisos de una hora a las apps web sin servidor. Cuando hay algo pendiente de enviar, la app lo renueva sola con un rebote rápido a Google (se puede desactivar en Ajustes). Si no, verás un aviso «cambios sin enviar» con un botón.
+
+### 5. Copia automática en Google Drive (opcional, recomendado)
+
+Con Google conectado, en *Ajustes → Copia de seguridad* activa **«Copia automática en Google Drive»** (Google pedirá permiso para la carpeta de la app). Desde entonces, cada día que haya cambios se guarda una copia en la carpeta **«Día a Día · copias»** de tu Drive (se guardan las 14 últimas; los PDF y archivos de las áreas van una sola vez en la subcarpeta «Archivos»). La app solo puede ver lo que ha creado ella, no el resto de tu Drive.
+
+- **Si cambias de móvil**: instala la app y, en la bienvenida, *Recuperar mi copia de Google Drive* (o luego en *Ajustes → Copia de seguridad → Recuperar de Drive*). Eliges la copia y vuelve todo: agenda, áreas, listas, finanzas, hábitos y archivos.
+- Si sale «Falta activar la API de Google Drive», el botón lleva a la página del proyecto de Google Cloud donde se activa con «Habilitar»; luego, «Copiar ahora».
 
 ---
 
@@ -137,8 +164,8 @@ La app de vuestro box (por lo que parece, **Strivee**) no tiene una API pública
 
 ## Privacidad y copias
 
-- Todo se guarda en el propio móvil (IndexedDB). Nada se envía a ningún servidor salvo a Google Calendar si lo conectáis, a vuestra hoja de Google si compartís el hogar (las listas de casa y la cuenta conjunta; «Mis finanzas» nunca sale del móvil) y, al buscar productos del súper, el texto buscado a Open Food Facts.
-- *Ajustes → Copia de seguridad* descarga un fichero con todo (incluidos los PDF). Se restaura desde Ajustes o desde la pantalla de bienvenida (útil al cambiar de móvil).
+- Todo se guarda en el propio móvil (IndexedDB). Nada se envía a ningún servidor salvo a Google Calendar si lo conectáis, a vuestra hoja de Google si compartís el hogar (las listas de casa, la cuenta conjunta y los planes que marquéis «en pareja»; «Mis finanzas» y lo demás nunca salen del móvil), a tu propio Google Drive si activas la copia automática y, al buscar productos del súper, el texto buscado a Open Food Facts. Los ficheros del banco se leen en el móvil.
+- *Ajustes → Copia de seguridad*: la copia automática en Google Drive (ver arriba) y, además, **descargar un fichero** con todo (incluidos los PDF) para guardarlo donde quieras. Las dos se recuperan desde Ajustes o desde la pantalla de bienvenida (útil al cambiar de móvil).
 
 ---
 
@@ -147,14 +174,14 @@ La app de vuestro box (por lo que parece, **Strivee**) no tiene una API pública
 ```bash
 npm install
 npm run dev        # servidor local
-npm test           # pruebas (fechas, frases, importadores, RM, Google, avisos, hogar compartido, alimentos, peso, finanzas…)
+npm test           # pruebas (fechas, frases, importadores, RM, Google, avisos, hogar compartido, alimentos, peso, finanzas, hábitos, banco, Drive…)
 npm run build      # genera dist/ (incluye el service worker para usarla sin conexión)
 ```
 
 Hecho con React + TypeScript + Vite, sin servidor. Estructura:
 
-- `src/screens/` — Hoy, Agenda, Áreas, Ajustes, bienvenida.
-- `src/modules/` — bloques de las áreas (plan, pendientes, objetivos, documentos, menú, calorías, peso, listas, finanzas, RM, notas).
+- `src/screens/` — Hoy, Agenda, Áreas, Ajustes (y apariencia), buscador, resumen de la semana, bienvenida.
+- `src/modules/` — bloques de las áreas (plan, pendientes, objetivos, documentos, menú, calorías, peso, listas, finanzas, hábitos, RM, notas).
 - `src/sheets/` — hojas de añadir y editar.
-- `src/lib/` — lógica: `quickParse` (frases en español), `importers` (planes y menús de Claude), `lifts` (porcentajes), `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`, `shareScript`/`shareSync` (hogar compartido con Apps Script), `foods`/`foodParse`/`openFoodFacts` (alimentos y macros), `metrics` (peso y gráfica), `finance`/`financeSync` (periodos de cobro a cobro, fijos, objetivos y la cuenta conjunta en la hoja).
+- `src/lib/` — lógica: `quickParse` (frases en español), `importers` (planes y menús de Claude), `lifts` (porcentajes), `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`, `shareScript`/`shareSync` (hogar compartido con Apps Script), `foods`/`foodParse`/`openFoodFacts` (alimentos y macros), `metrics` (peso y gráfica), `finance`/`financeSync` (periodos de cobro a cobro, fijos, objetivos y la cuenta conjunta en la hoja), `bankImport` (Excel y CSV del banco), `planSync` (planes en pareja), `driveBackup` (copia en Google Drive), `habits`, `menuShopping` (del menú a la compra), `search`, `weekSummary`, `todayLayout`.
 - `src/store/` — datos y guardado local.

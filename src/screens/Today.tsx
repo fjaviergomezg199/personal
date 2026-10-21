@@ -1,5 +1,5 @@
-import { Plus, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw, Search } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AgendaRow, EntryRow } from '../components/AgendaRow';
 import { DayView } from '../components/DayView';
 import { MacroSummary } from '../components/MacroSummary';
@@ -10,11 +10,15 @@ import { addDays, capitalize, formatLong, formatRelative, formatShort, greeting,
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { currentPeriod, daysLeft, eur, eurInt, occurrencesIn, payDue, summarizePeriod } from '../lib/finance';
 import { sumMacros } from '../lib/foods';
+import { HabitsToday } from '../modules/HabitsModule';
 import { MovementSheet } from '../sheets/MovementSheet';
+import type { ModuleKey, TodaySection } from '../store/types';
+import { resolveLayout } from '../lib/todayLayout';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
-import { useApp } from '../store/store';
+import { getState, useApp } from '../store/store';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
+import { WeekCard } from './Week';
 
 export function Today() {
   const state = useApp();
@@ -29,6 +33,7 @@ export function Today() {
   // Enlaces directos: #/hoy?nuevo=1, #/hoy?ver=<id> (desde un aviso)
   const ver = route.query.get('ver');
   const nuevo = route.query.get('nuevo');
+  const accion = route.query.get('accion');
   useEffect(() => {
     if (ver) {
       clearQuery('ver');
@@ -36,8 +41,21 @@ export function Today() {
     } else if (nuevo) {
       clearQuery('nuevo');
       openSheet({ type: 'quick' });
+    } else if (accion) {
+      // Atajos del icono de la app
+      clearQuery('accion');
+      const s = getState();
+      const area = (m: ModuleKey) => sortedAreas(s).find((a) => a.modules.includes(m));
+      if (accion === 'gasto') openSheet({ type: 'movement', scope: 'personal', kind: 'gasto' });
+      else if (accion === 'compra') {
+        const a = area('shopping');
+        navigate(a ? `/areas/${a.id}?bloque=shopping` : '/areas');
+      } else if (accion === 'comida') {
+        const a = area('diary');
+        navigate(a ? `/areas/${a.id}?bloque=diary&nuevo=1` : '/areas');
+      } else if (accion === 'buscar') navigate('/buscar');
     }
-  }, [ver, nuevo]);
+  }, [ver, nuevo, accion]);
 
   const areas = useMemo(() => areaMap(state), [state]);
   const items = useMemo(() => agendaForDate(state, today, areas), [state, today, areas]);
@@ -64,40 +82,8 @@ export function Today() {
   const pendingCount = agenda.filter((i) => (i.kind === 'entry' && i.entry.kind !== 'event') || i.kind === 'plan').filter((i) => !('done' in i && i.done)).length;
   const name = state.settings.name;
 
-  return (
-    <div className="screen">
-      <div className="screen-header">
-        <div>
-          <div className="hello">
-            {greeting()}
-            {name ? `, ${name}` : ''} 👋
-          </div>
-          <h1>Hoy</h1>
-          <div className="sub">{capitalize(formatLong(today))}</div>
-        </div>
-        <div className="actions">
-          <GoogleStatusButton />
-        </div>
-      </div>
-
-      <button className="quick-bar" onClick={() => openSheet({ type: 'quick' })}>
-        <Plus size={20} color="var(--primary)" />
-        <span className="ph">Añade algo… «mañana a las 10 dentista»</span>
-      </button>
-      <GoogleBanner />
-
-      {birthdays.map((b) =>
-        b.kind === 'birthday' ? (
-          <div key={b.key} className="banner tone-pink mt12" role="button" onClick={() => openSheet({ type: 'birthday', id: b.birthday.id })}>
-            <div className="big">🎂</div>
-            <div className="grow">
-              <div className="t">Hoy es el cumpleaños de {b.birthday.name}</div>
-              <div className="d">{b.age ? `Cumple ${b.age} años. ` : ''}¡No te olvides de felicitar!</div>
-            </div>
-          </div>
-        ) : null,
-      )}
-
+  const blocks: Record<TodaySection, ReactNode> = {
+    dayview: (
       <div className="section">
         <SectionHead
           title="Día a vista"
@@ -110,60 +96,58 @@ export function Today() {
         />
         <DayView date={day} today={today} onDateChange={(d) => setDay({ base: today, date: d })} />
       </div>
-
-      <ShoppingPeek />
-
-      {overdue.length > 0 && (
-        <div className="section">
-          <SectionHead title="Se te pasó" count={overdue.length} />
-          <div className="list">
-            {(showAllOverdue ? overdue : overdue.slice(0, 3)).map((e) => (
-              <EntryRow key={e.id} entry={e} area={e.areaId ? areas.get(e.areaId) : undefined} showDate overdue />
-            ))}
-          </div>
-          {overdue.length > 3 && (
-            <button className="link-btn mt8" onClick={() => setShowAllOverdue(!showAllOverdue)}>
-              {showAllOverdue ? 'Ver menos' : `Ver ${overdue.length - 3} más`}
+    ),
+    shopping: <ShoppingPeek />,
+    overdue: overdue.length > 0 && (
+      <div className="section">
+        <SectionHead title="Se te pasó" count={overdue.length} />
+        <div className="list">
+          {(showAllOverdue ? overdue : overdue.slice(0, 3)).map((e) => (
+            <EntryRow key={e.id} entry={e} area={e.areaId ? areas.get(e.areaId) : undefined} showDate overdue />
+          ))}
+        </div>
+        {overdue.length > 3 && (
+          <button className="link-btn mt8" onClick={() => setShowAllOverdue(!showAllOverdue)}>
+            {showAllOverdue ? 'Ver menos' : `Ver ${overdue.length - 3} más`}
+          </button>
+        )}
+      </div>
+    ),
+    week: <WeekCard today={today} />,
+    habits: <HabitsToday today={today} />,
+    menu: menus.map(({ area, meals }) => (
+      <div className="section" key={area.id}>
+        <SectionHead
+          title={`${area.emoji} Menú de ${day === today ? 'hoy' : day === addDays(today, 1) ? 'mañana' : formatShort(day)}`}
+          action={
+            <button className="link-btn" onClick={() => navigate(`/areas/${area.id}?bloque=menu`)}>
+              Semana
             </button>
-          )}
+          }
+        />
+        <div className={`card tone-${area.color}`}>
+          {meals.map((m) => (
+            <div className="meal" key={m.meal}>
+              <div className="m">{m.meal}</div>
+              <div className="x">{m.text}</div>
+            </div>
+          ))}
         </div>
-      )}
-
-      {menus.map(({ area, meals }) => (
-        <div className="section" key={area.id}>
-          <SectionHead
-            title={`${area.emoji} Menú de ${day === today ? 'hoy' : day === addDays(today, 1) ? 'mañana' : formatShort(day)}`}
-            action={
-              <button className="link-btn" onClick={() => navigate(`/areas/${area.id}?bloque=menu`)}>
-                Semana
-              </button>
-            }
-          />
-          <div className={`card tone-${area.color}`}>
-            {meals.map((m) => (
-              <div className="meal" key={m.meal}>
-                <div className="m">{m.meal}</div>
-                <div className="x">{m.text}</div>
-              </div>
-            ))}
-          </div>
+      </div>
+    )),
+    diary: <MacrosPeek today={today} />,
+    money: <FinancePeek today={today} />,
+    goals: goals.length > 0 && (
+      <div className="section">
+        <SectionHead title="Objetivos" />
+        <div className="list">
+          {goals.map((g) => (
+            <GoalRow key={g.id} goal={g} area={g.areaId ? areas.get(g.areaId) : undefined} date={today} />
+          ))}
         </div>
-      ))}
-
-      <MacrosPeek today={today} />
-      <FinancePeek today={today} />
-
-      {goals.length > 0 && (
-        <div className="section">
-          <SectionHead title="Objetivos" />
-          <div className="list">
-            {goals.map((g) => (
-              <GoalRow key={g.id} goal={g} area={g.areaId ? areas.get(g.areaId) : undefined} date={today} />
-            ))}
-          </div>
-        </div>
-      )}
-
+      </div>
+    ),
+    inbox: (
       <div className="section">
         <SectionHead
           title="Pendientes"
@@ -191,24 +175,65 @@ export function Today() {
           <div className="card small muted">Sin pendientes sueltos. Las tareas de cada área están en su página.</div>
         )}
       </div>
-
-      {upcoming.length > 0 && (
-        <div className="section">
-          <SectionHead
-            title="Próximamente"
-            action={
-              <button className="link-btn" onClick={() => navigate('/agenda?vista=lista')}>
-                Ver todo
-              </button>
-            }
-          />
-          <div className="list">
-            {upcoming.map((i) => (
-              <AgendaRow key={i.key} item={i} trail={<b>{formatRelative(i.date, today)}</b>} />
-            ))}
-          </div>
+    ),
+    upcoming: upcoming.length > 0 && (
+      <div className="section">
+        <SectionHead
+          title="Próximamente"
+          action={
+            <button className="link-btn" onClick={() => navigate('/agenda?vista=lista')}>
+              Ver todo
+            </button>
+          }
+        />
+        <div className="list">
+          {upcoming.map((i) => (
+            <AgendaRow key={i.key} item={i} trail={<b>{formatRelative(i.date, today)}</b>} />
+          ))}
         </div>
+      </div>
+    ),
+  };
+  const layout = resolveLayout(state.settings.todayLayout);
+
+  return (
+    <div className="screen">
+      <div className="screen-header">
+        <div>
+          <div className="hello">
+            {greeting()}
+            {name ? `, ${name}` : ''} {state.settings.emoji || '👋'}
+          </div>
+          <h1>Hoy</h1>
+          <div className="sub">{capitalize(formatLong(today))}</div>
+        </div>
+        <div className="actions">
+          <button className="icon-btn" aria-label="Buscar" onClick={() => navigate('/buscar')}>
+            <Search size={19} />
+          </button>
+          <GoogleStatusButton />
+        </div>
+      </div>
+
+      <button className="quick-bar" onClick={() => openSheet({ type: 'quick' })}>
+        <Plus size={20} color="var(--primary)" />
+        <span className="ph">Añade algo… «mañana a las 10 dentista»</span>
+      </button>
+      <GoogleBanner />
+
+      {birthdays.map((b) =>
+        b.kind === 'birthday' ? (
+          <div key={b.key} className="banner tone-pink mt12" role="button" onClick={() => openSheet({ type: 'birthday', id: b.birthday.id })}>
+            <div className="big">🎂</div>
+            <div className="grow">
+              <div className="t">Hoy es el cumpleaños de {b.birthday.name}</div>
+              <div className="d">{b.age ? `Cumple ${b.age} años. ` : ''}¡No te olvides de felicitar!</div>
+            </div>
+          </div>
+        ) : null,
       )}
+
+      {layout.map(({ key, hidden }) => (hidden ? null : <Fragment key={key}>{blocks[key]}</Fragment>))}
 
       {state.areas.length === 0 && (
         <div className="section">
@@ -251,7 +276,7 @@ function ShoppingPeek() {
   const names = items.slice(0, 4).map((i) => i.text).join(', ');
   return (
     <button className="card hstack mt12" style={{ width: '100%', textAlign: 'left', border: 0 }} onClick={() => navigate(`/areas/${area.id}?bloque=shopping`)}>
-      <span style={{ fontSize: 22 }}>🛒</span>
+      <span style={{ fontSize: 'calc(22px * var(--fs))' }}>🛒</span>
       <div className="grow">
         <div style={{ fontWeight: 700 }}>
           Lista de la compra · {items.length}
@@ -320,7 +345,7 @@ function FinancePeek({ today }: { today: string }) {
         <div className="ms-head">
           <div>
             <div className="ms-label">Gastado este periodo</div>
-            <div className="ms-hero" style={{ fontSize: 28 }}>
+            <div className="ms-hero" style={{ fontSize: 'calc(28px * var(--fs))' }}>
               {eurInt(s.spent)}
               {total !== undefined && <span className="ms-of"> de {eurInt(total)}</span>}
             </div>

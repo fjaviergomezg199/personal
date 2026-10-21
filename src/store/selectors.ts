@@ -1,4 +1,5 @@
 import { addDays, ageOn, daysBetween, weekdayIndex } from '../lib/dates';
+import { fold } from '../lib/quickParse';
 import { isDoneOn, nextBirthday, occursOn } from '../lib/recurrence';
 import type { AppState, Area, Birthday, Entry, GoogleCalendarInfo, GoogleEvent, HHMM, ISODate, PlanItem } from './types';
 
@@ -120,4 +121,20 @@ export function todaysMenu(area: Area, date: ISODate): { meal: string; text: str
 
 export function sortedAreas(s: AppState): Area[] {
   return [...s.areas].sort((a, b) => a.order - b.order);
+}
+
+/** El nombre de la otra persona del hogar compartido (por lo último que ha apuntado). */
+export function partnerName(s: AppState): string | undefined {
+  const mine = fold(s.settings.name.trim());
+  let best: { name: string; t: number } | undefined;
+  const see = (by: string | undefined, t: number) => {
+    const name = by?.trim();
+    if (!name || fold(name) === mine) return;
+    if (!best || t > best.t) best = { name, t };
+  };
+  for (const i of s.listItems) see(i.by, i.updatedAt);
+  for (const m of s.finance.movements) if (m.scope === 'hogar') see(m.by, m.updatedAt);
+  for (const f of s.finance.recurring) if (f.scope === 'hogar') see(f.by, f.updatedAt);
+  for (const e of s.entries) if (e.shared) see(e.by, Date.parse(e.updatedAt) || 0);
+  return best?.name;
 }

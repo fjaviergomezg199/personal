@@ -2,7 +2,8 @@ import { Check, Plus, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from '../components/ui';
 import { importBackup } from '../lib/backup';
-import { addArea, updateSettings } from '../store/store';
+import { startDriveRestore } from '../lib/syncRunner';
+import { addArea, getState, updateSettings } from '../store/store';
 import { TEMPLATES } from '../store/templates';
 import type { TemplateKey } from '../store/types';
 import { InstallCard } from './Install';
@@ -75,6 +76,11 @@ export function Onboarding() {
             <button className="btn block" disabled={!name.trim()} onClick={() => setStep(1)}>
               Siguiente
             </button>
+            {getState().settings.google.clientId && (
+              <button className="btn ghost block mt8" onClick={startDriveRestore}>
+                Recuperar mi copia de Google Drive
+              </button>
+            )}
             <button className="btn ghost block mt8" onClick={() => restoreInput.current?.click()}>
               Tengo una copia de seguridad
             </button>

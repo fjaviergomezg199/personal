@@ -2,7 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { GoalRow } from '../components/GoalRow';
 import { Empty, Segmented, Sheet, toast } from '../components/ui';
-import { addDays, addMonths, monthKey, todayISO, weekKey } from '../lib/dates';
+import { addDays, addMonths, localDay, monthKey, todayISO, weekKey } from '../lib/dates';
 import { addGoal, bumpGoal, deleteGoal, goalValue, restoreGoal, updateGoal, useApp } from '../store/store';
 import type { Area, Goal, GoalPeriod } from '../store/types';
 
@@ -20,7 +20,7 @@ function history(goal: Goal, today: string): { label: string; ok: boolean }[] {
   for (let i = 4; i >= 1; i--) {
     const d = goal.period === 'week' ? addDays(today, -7 * i) : addMonths(today, -i);
     const key = goal.period === 'week' ? weekKey(d) : monthKey(d);
-    if (goal.createdAt.slice(0, 10) > d && (goal.progress[key] ?? 0) === 0) continue;
+    if (localDay(goal.createdAt) > d && (goal.progress[key] ?? 0) === 0) continue;
     out.push({ label: key, ok: (goal.progress[key] ?? 0) >= goal.target });
   }
   return out;

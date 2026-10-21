@@ -1,13 +1,15 @@
 import { useSyncExternalStore } from 'react';
-import { applyFinanceSync, applySyncResult, getState, patchShare } from '../store/store';
+import { applyFinanceSync, applyPlanSync, applySyncResult, getState, patchShare } from '../store/store';
 import type { ID, ListItem, ShareConfig } from '../store/types';
 import { financeOutbox, mergeFinance, type SharedRecords } from './financeSync';
+import { mergePlans, planOutbox, PLANS_SCRIPT } from './planSync';
 
 /*
  * Hogar compartido: las listas se guardan en una hoja de cálculo de Google con
  * un pequeño Apps Script (ver shareScript.ts). Cada móvil envía sus cambios y
  * recibe la lista completa; si los dos cambian lo mismo, gana el último.
  */
+
 
 export interface LocalLists {
   items: ListItem[];
@@ -59,16 +61,18 @@ export function readJoinCode(text: string): Pick<ShareConfig, 'url' | 'key' | 'n
 
 export interface ServerData {
   items: ListItem[];
-  /** Cuenta conjunta (solo con el código de la hoja versión 3 o posterior). */
+  /** Cuenta conjunta (versión 3 o posterior del código de la hoja) y planes (versión 4). */
   registros?: SharedRecords;
   version: number;
   /** Hora de la hoja (para pedir la próxima vez solo lo nuevo). */
   ahora?: number;
+  /** Pestañas que la hoja no ha podido usar (una vuestra con el mismo nombre…). */
+  bloqueados?: string[];
 }
 
 async function readResponse(res: Response): Promise<ServerData> {
   const text = await res.text();
-  let data: { ok?: boolean; error?: string; items?: ListItem[]; registros?: SharedRecords; version?: number; ahora?: number };
+  let data: { ok?: boolean; error?: string; items?: ListItem[]; registros?: SharedRecords; version?: number; ahora?: number; bloqueados?: string[] };
   try {
     data = JSON.parse(text);
   } catch {
@@ -88,7 +92,13 @@ async function readResponse(res: Response): Promise<ServerData> {
     by: i.by || undefined,
     deleted: !!i.deleted,
   }));
-  return { items, registros: data.registros, version: Number(data.version) || 2, ahora: Number(data.ahora) || undefined };
+  return {
+    items,
+    registros: data.registros,
+    version: Number(data.version) || 2,
+    ahora: Number(data.ahora) || undefined,
+    bloqueados: Array.isArray(data.bloqueados) ? data.bloqueados.map(String) : undefined,
+  };
 }
 
 async function call(
@@ -180,6 +190,17 @@ export async function syncOnce(local: LocalLists, share: Pick<ShareConfig, 'url'
 
 /* ---------- Sincronización de la app ---------- */
 
+const WHAT: Record<string, string> = { Planes: 'los planes en pareja', Movimientos: 'la cuenta conjunta', Fijos: 'la cuenta conjunta', Cuenta: 'la cuenta conjunta' };
+
+/** Aviso si la hoja no ha podido usar alguna pestaña (lo de esa pestaña sigue guardado en el móvil). */
+export function blockedNotice(names: string[] | undefined): string | undefined {
+  if (!names?.length) return undefined;
+  const tabs = names.map((n) => `«${n}»`);
+  const list = tabs.length === 1 ? tabs[0] : `${tabs.slice(0, -1).join(', ')} y ${tabs.at(-1)}`;
+  const what = [...new Set(names.map((n) => WHAT[n] ?? 'todo'))].join(' y ');
+  return `Cambia el nombre de ${tabs.length === 1 ? 'la pestaña' : 'las pestañas'} ${list} de vuestra hoja de Google (la app ${tabs.length === 1 ? 'la' : 'las'} necesita para compartir ${what}). Mientras, se guarda en el móvil.`;
+}
+
 let syncing = false;
 let again = false;
 const listeners = new Set<() => void>();
@@ -216,23 +237,41 @@ export async function syncShare(): Promise<void> {
       if (!share) return;
       const sentIds = new Set(s.listPending);
       const sent = s.listItems.filter((i) => sentIds.has(i.id));
-      const out = financeOutbox(s.finance, s.settings.name.trim() || undefined);
+      const me = s.settings.name.trim() || undefined;
+      const out = financeOutbox(s.finance, me);
+      // Con el código antiguo de la hoja los planes esperan (no se pierden) a que se actualice.
+      const plansOk = (share.scriptVersion ?? PLANS_SCRIPT) >= PLANS_SCRIPT;
+      const plans = planOutbox({ entries: s.entries, pending: plansOk ? s.planPending : [], gone: s.planGone }, me);
+      const records: SharedRecords = plans.rows.length ? { ...out.records, Planes: plans.rows } : out.records;
       const full = !fullDone || !share.since || Date.now() - share.since > FULL_EVERY;
       try {
-        const server = await exchange(share, sent, out.records, full ? 0 : Math.max(0, (share.since ?? 0) - OVERLAP));
+        const server = await exchange(share, sent, records, full ? 0 : Math.max(0, (share.since ?? 0) - OVERLAP));
         const cur = getState();
         if (!cur.share || cur.share.url !== share.url) return;
         const r = reconcile({ items: cur.listItems, pending: cur.listPending }, sent, server.items);
         const finOk = server.version >= 3 && !!server.registros;
         applySyncResult(r.items, r.pending, {
           lastSync: Date.now(),
-          error: undefined,
+          error: blockedNotice(server.bloqueados),
           scriptVersion: server.version,
           ...(finOk && server.ahora ? { since: server.ahora } : {}),
         });
         if (finOk) {
           applyFinanceSync(mergeFinance(getState().finance, out.sent, server.registros!, full), {});
           if (full) fullDone = true;
+        }
+        if (server.version >= PLANS_SCRIPT && server.registros) {
+          const st = getState();
+          const merged = mergePlans(
+            { entries: st.entries, pending: st.planPending, gone: st.planGone },
+            plans.sent,
+            server.registros.Planes,
+            full,
+            st.settings.defaultAlert,
+          );
+          applyPlanSync(merged);
+          // Recién actualizado el código de la hoja: se envía ya lo que esperaba.
+          if (!plansOk && merged.pending.length) again = true;
         }
       } catch (err) {
         patchShare({ error: err instanceof ShareError ? err.message : 'No se pudo sincronizar.' });

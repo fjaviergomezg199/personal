@@ -111,7 +111,7 @@ export function PlanItemSheet(props: { id: ID; onClose: () => void }) {
             {capitalize(formatLong(item.date))}
             {item.time ? ` · ${item.time}` : ''}
           </div>
-          <h2 style={{ margin: '4px 0 12px', fontSize: 22, lineHeight: 1.25 }}>{item.title}</h2>
+          <h2 style={{ margin: '4px 0 12px', fontSize: 'calc(22px * var(--fs))', lineHeight: 1.25 }}>{item.title}</h2>
           {item.details && (
             <div className="card" style={{ marginBottom: 14 }}>
               <SessionText text={item.details} area={area} />

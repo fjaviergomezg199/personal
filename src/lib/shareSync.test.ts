@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ListItem } from '../store/types';
-import { makeJoinCode, readJoinCode, reconcile, ShareError, syncOnce, type LocalLists } from './shareSync';
+import { blockedNotice, exchange, makeJoinCode, readJoinCode, reconcile, ShareError, syncOnce, type LocalLists } from './shareSync';
 import { fakeGoogle } from './testing/fakeGoogle';
 
 const item = (p: Partial<ListItem>): ListItem => ({ id: 'L1', list: 'compra', text: 'Leche', done: false, updatedAt: 1000, ...p });
@@ -15,20 +15,28 @@ describe('Apps Script del hogar compartido', () => {
     expect(r).toEqual({ items: [], pending: [] });
     expect(g.sheets.Lista[0]).toEqual(['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado']);
     // Todo en formato texto: Sheets no convierte «1/2» en fecha ni «007» en 7
-    expect(g.formats).toEqual(['A:Z=@', 'A:Z=@', 'A:Z=@', 'A:D=@', 'G:G=@']);
-    expect(Object.keys(g.sheets).sort()).toEqual(['Cuenta', 'Fijos', 'Lista', 'Movimientos']);
+    expect(g.formats).toEqual(['A:D=@', 'G:G=@']);
+    // Las demás pestañas se crean cuando hay algo que guardar
+    expect(Object.keys(g.sheets)).toEqual(['Lista']);
+    const r2 = await exchange(g.share, [], { Movimientos: [{ id: 'M1', fecha: '2026-10-21', actualizado: '5' }] }, 0, g.fetchImpl);
+    expect(Object.keys(g.sheets).sort()).toEqual(['Lista', 'Movimientos']);
+    expect(g.formats).toEqual(['A:D=@', 'G:G=@', 'A:Z=@']);
+    // Solo vienen las pestañas que existen (lo que no viene no se da por borrado)
+    expect(Object.keys(r2.registros!)).toEqual(['Movimientos']);
+    expect(r2.bloqueados).toEqual([]);
+    expect(r2.version).toBe(4);
   });
 
   it('dos móviles comparten la lista', async () => {
     const g = fakeGoogle();
-    let a: LocalLists = { items: [item({ id: 'La', text: 'Leche', by: 'Leire' }), item({ id: 'Lb', text: 'Pan', qty: '2' })], pending: ['La', 'Lb'] };
+    let a: LocalLists = { items: [item({ id: 'La', text: 'Leche', by: 'Leyre' }), item({ id: 'Lb', text: 'Pan', qty: '2' })], pending: ['La', 'Lb'] };
     let b: LocalLists = { items: [], pending: [] };
 
     a = await syncOnce(a, g.share, g.fetchImpl);
     expect(a.pending).toEqual([]);
     b = await syncOnce(b, g.share, g.fetchImpl);
     expect(b.items.map((i) => [i.text, i.qty, i.by])).toEqual([
-      ['Leche', undefined, 'Leire'],
+      ['Leche', undefined, 'Leyre'],
       ['Pan', '2', undefined],
     ]);
 
@@ -85,6 +93,56 @@ describe('Apps Script del hogar compartido', () => {
     await expect(syncOnce({ items: [], pending: [] }, { url: 'u', key: 'k' }, offline)).rejects.toMatchObject({ code: 'offline' });
     const html = vi.fn(async () => new Response('<html>Inicia sesión</html>', { status: 200 }));
     await expect(syncOnce({ items: [], pending: [] }, { url: 'u', key: 'k' }, html)).rejects.toBeInstanceOf(ShareError);
+  });
+});
+
+describe('hojas de registros (código de la hoja v4)', () => {
+  it('guarda tipos de datos nuevos sin cambiar el código, y añade columnas nuevas', async () => {
+    const g = fakeGoogle();
+    await exchange(g.share, [], { Ideas: [{ id: 'I1', texto: 'Ir a Asturias', actualizado: '10', borrado: 'false' }] } as never, 0, g.fetchImpl);
+    expect(g.sheets.Ideas[0]).toEqual(['id', 'texto', 'actualizado', 'borrado', 'recibido']);
+    // Una versión posterior de la app manda un dato más
+    const r = await exchange(g.share, [], { Ideas: [{ id: 'I2', texto: 'Cena en casa', prioridad: 'alta', actualizado: '20', borrado: 'false' }] } as never, 0, g.fetchImpl);
+    expect(g.sheets.Ideas[0]).toEqual(['id', 'texto', 'actualizado', 'borrado', 'recibido', 'prioridad']);
+    const ideas = (r.registros as Record<string, Record<string, string>[]>).Ideas;
+    expect(ideas.map((i) => [i.id, i.texto, i.prioridad])).toEqual([
+      ['I1', 'Ir a Asturias', ''],
+      ['I2', 'Cena en casa', 'alta'],
+    ]);
+  });
+
+  it('no toca la lista ni las pestañas que no son suyas, y dice lo que no ha guardado', async () => {
+    const g = fakeGoogle();
+    g.sheets.Notas = [['Fecha', 'Qué'], ['1/10', 'Mis cosas']];
+    const r = await exchange(g.share, [], { Lista: [{ id: 'x', actualizado: '1' }], Notas: [{ id: 'N1', actualizado: '1' }], hola: [{ id: 'h' }] } as never, 0, g.fetchImpl);
+    expect(r.bloqueados).toEqual(['Lista', 'Notas', 'hola']);
+    expect(g.sheets.Notas).toEqual([['Fecha', 'Qué'], ['1/10', 'Mis cosas']]);
+    // Solo se mira su cabecera, no se lee entera
+    expect(g.reads.Notas).toBeUndefined();
+    expect(g.sheets.Lista).toEqual([['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado']]);
+    expect(Object.keys(g.sheets).sort()).toEqual(['Lista', 'Notas']);
+  });
+});
+
+describe('pestañas vuestras con el nombre que usa la app', () => {
+  it('una pestaña «Planes» propia: los planes no se borran, siguen pendientes y se avisa', async () => {
+    const g = fakeGoogle();
+    g.sheets.Planes = [['Qué', 'Cuándo'], ['Vacaciones', 'agosto']];
+    const r = await exchange(g.share, [], { Planes: [{ id: 'E1', titulo: 'Cine', actualizado: '5', borrado: 'false' }] }, 0, g.fetchImpl);
+    expect(r.registros?.Planes).toBeUndefined();
+    expect(r.bloqueados).toEqual(['Planes']);
+    expect(g.sheets.Planes).toEqual([['Qué', 'Cuándo'], ['Vacaciones', 'agosto']]);
+    expect(blockedNotice(r.bloqueados)).toMatch(/Cambia el nombre de la pestaña «Planes».*planes en pareja/);
+    // Al leer también se avisa
+    expect((await exchange(g.share, [], {}, 0, g.fetchImpl)).bloqueados).toEqual(['Planes']);
+  });
+
+  it('una pestaña vacía con ese nombre se aprovecha', async () => {
+    const g = fakeGoogle();
+    g.sheets.Planes = [];
+    const r = await exchange(g.share, [], { Planes: [{ id: 'E1', titulo: 'Cine', actualizado: '5', borrado: 'false' }] }, 0, g.fetchImpl);
+    expect(r.bloqueados).toEqual([]);
+    expect(r.registros?.Planes?.map((p) => p.titulo)).toEqual(['Cine']);
   });
 });
 

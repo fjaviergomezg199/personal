@@ -100,13 +100,14 @@ export const MODULE_INFO: Record<ModuleKey, { label: string; emoji: string; desc
   metrics: { label: 'Peso y medidas', emoji: '⚖️', description: 'Tu peso (y otras medidas) con la gráfica de cómo evoluciona.' },
   money: { label: 'Mis finanzas', emoji: '💶', description: 'Tus gastos e ingresos, objetivos de gasto y fijos. Solo en tu móvil.' },
   jointMoney: { label: 'Cuenta conjunta', emoji: '🤝', description: 'Hipoteca, facturas y gastos de casa, compartidos entre los dos móviles.' },
+  habits: { label: 'Hábitos', emoji: '✅', description: 'Lo que quieres hacer cada día (agua, leer, estirar…) con su racha.' },
 };
 
 export function moduleLabel(area: Pick<Area, 'labels'>, m: ModuleKey): string {
   return area.labels?.[m] ?? MODULE_INFO[m].label;
 }
 
-export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'diary', 'metrics', 'shopping', 'chores', 'money', 'jointMoney', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
+export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'diary', 'metrics', 'habits', 'shopping', 'chores', 'money', 'jointMoney', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
 
 export const AREA_COLORS: AreaColor[] = ['violet', 'blue', 'teal', 'green', 'amber', 'orange', 'rose', 'pink', 'slate'];
 

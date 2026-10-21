@@ -1,9 +1,9 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChartNoAxesColumn, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { AgendaRow } from '../components/AgendaRow';
 import { openSheet } from '../components/sheets';
 import { Empty, Segmented } from '../components/ui';
-import { addDays, capitalize, formatDayMonth, formatLong, formatRelative, MONTHS_SHORT, parseISODate, startOfWeek, WEEKDAY_LETTERS } from '../lib/dates';
+import { addDays, capitalize, formatDayMonth, formatLong, formatRelative, formatWeek, parseISODate, startOfWeek, WEEKDAY_LETTERS } from '../lib/dates';
 import { navigate, useRoute } from '../lib/router';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, upcomingAgenda, upcomingBirthdays, type AgendaItem } from '../store/selectors';
@@ -25,6 +25,9 @@ export function Agenda() {
           <h1>Agenda</h1>
         </div>
         <div className="actions">
+          <button className="icon-btn" aria-label="Resumen de la semana" onClick={() => navigate('/semana')}>
+            <ChartNoAxesColumn size={19} />
+          </button>
           <GoogleStatusButton />
           <button className="icon-btn primary" aria-label="Añadir" onClick={() => openSheet(view === 'cumples' ? { type: 'birthday' } : { type: 'quick' })}>
             <Plus size={20} />
@@ -71,13 +74,7 @@ function WeekView({ today }: { today: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const end = addDays(weekStart, 6);
-  const s = parseISODate(weekStart);
-  const e = parseISODate(end);
-  const label =
-    s.getMonth() === e.getMonth()
-      ? `${s.getDate()} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`
-      : `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
+  const label = formatWeek(weekStart);
 
   return (
     <div>

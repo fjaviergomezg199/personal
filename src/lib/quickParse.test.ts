@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanTitle, parseQuick } from './quickParse';
+import { cleanTitle, parseQuick, mentionsPartner } from './quickParse';
 
 // Miércoles 21 de octubre de 2026, 10:00
 const NOW = new Date(2026, 9, 21, 10, 0);
@@ -69,7 +69,7 @@ describe('parseQuick', () => {
   });
 
   it('esta tarde', () => {
-    expect(p('esta tarde llamar a Leire')).toMatchObject({ date: '2026-10-21', time: '17:00', title: 'Llamar a Leire', kind: 'reminder' });
+    expect(p('esta tarde llamar a Leyre')).toMatchObject({ date: '2026-10-21', time: '17:00', title: 'Llamar a Leyre', kind: 'reminder' });
   });
 
   it('mañana por la mañana', () => {
@@ -138,5 +138,17 @@ describe('cleanTitle', () => {
     expect(cleanTitle('  el  dentista   a ')).toBe('Dentista');
     expect(cleanTitle('aún queda')).toBe('Aún queda');
     expect(cleanTitle(', cena con Ana -')).toBe('Cena con Ana');
+  });
+});
+
+describe('planes en pareja', () => {
+  it('se reconoce cuando nombra a la otra persona o dice «en pareja»', () => {
+    expect(mentionsPartner('cena con Leyre el sábado', 'Leyre')).toBe(true);
+    expect(mentionsPartner('Cena con LEYRE', 'Leyre García')).toBe(true);
+    expect(mentionsPartner('cine en pareja el viernes')).toBe(true);
+    expect(mentionsPartner('ir juntos a por el coche')).toBe(true);
+    expect(mentionsPartner('dentista mañana a las 10', 'Leyre')).toBe(false);
+    expect(mentionsPartner('Leyrella', 'Leyre')).toBe(false);
+    expect(mentionsPartner('cena con Javi', undefined)).toBe(false);
   });
 });

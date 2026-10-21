@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Pencil, Plus, Repeat, Target, TriangleAlert, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileDown, Pencil, Plus, Repeat, Target, TriangleAlert, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Empty, toast } from '../components/ui';
 import { capitalize, daysBetween, formatShort, todayISO } from '../lib/dates';
@@ -9,6 +9,7 @@ import {
 import { useToday } from '../lib/useToday';
 import { getState, updateFinAccount, useApp } from '../store/store';
 import type { Area, FinScope, Movement } from '../store/types';
+import { BankImportSheet } from '../sheets/BankImportSheet';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
 import { BudgetsSheet, OccurrenceSheet, PeriodSetup, PeriodSheet, RecurringListSheet, RecurringSheet } from '../sheets/FinanceSheets';
 import { MovementSheet } from '../sheets/MovementSheet';
@@ -57,6 +58,7 @@ export function FinanceModule({ area, scope }: { area: Area; scope: FinScope }) 
   const [occurrence, setOccurrence] = useState<Occurrence | null>(null);
   const [editFixed, setEditFixed] = useState<Occurrence['recurring'] | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const go = (i: number) => {
     setSel({ base: today, start: periods[i].start });
@@ -213,6 +215,9 @@ export function FinanceModule({ area, scope }: { area: Area; scope: FinScope }) 
           <Plus size={18} /> Ingreso
         </button>
       </div>
+      <button className="link-btn mt8" style={{ marginLeft: 2 }} onClick={() => setImporting(true)}>
+        <FileDown size={15} style={{ verticalAlign: -2 }} /> Importar movimientos del banco
+      </button>
 
       {lines.length > 0 ? (
         <div className="section">
@@ -433,6 +438,7 @@ export function FinanceModule({ area, scope }: { area: Area; scope: FinScope }) 
       )}
       {editFixed && <RecurringSheet scope={scope} recurring={editFixed} onClose={() => setEditFixed(null)} />}
       {sharing && <HomeShareSheet onClose={() => setSharing(false)} />}
+      {importing && <BankImportSheet scope={scope} onClose={() => setImporting(false)} />}
     </div>
   );
 }

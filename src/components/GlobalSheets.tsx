@@ -3,7 +3,9 @@ import { EntrySheet } from '../sheets/EntrySheet';
 import { GoogleEventSheet } from '../sheets/GoogleEventSheet';
 import { PlanItemSheet } from '../sheets/PlanItemSheet';
 import { QuickAddSheet } from '../sheets/QuickAdd';
-import { closeSheet, useCurrentSheet } from './sheets';
+import { MovementSheet } from '../sheets/MovementSheet';
+import { useApp } from '../store/store';
+import { closeSheet, useCurrentSheet, type SheetRequest } from './sheets';
 
 export function GlobalSheets() {
   const req = useCurrentSheet();
@@ -19,5 +21,15 @@ export function GlobalSheets() {
       return <PlanItemSheet key={req.id} id={req.id} onClose={closeSheet} />;
     case 'google':
       return <GoogleEventSheet event={req.event} onClose={closeSheet} />;
+    case 'movement':
+      return <MovementFromStore key={req.id ?? 'new'} req={req} />;
   }
+}
+
+/** Un gasto o ingreso (nuevo, o uno ya apuntado si llega su id). */
+function MovementFromStore({ req }: { req: Extract<SheetRequest, { type: 'movement' }> }) {
+  const state = useApp();
+  const movement = req.id ? state.finance.movements.find((m) => m.id === req.id && !m.deleted) : undefined;
+  if (req.id && !movement) return null;
+  return <MovementSheet scope={movement?.scope ?? req.scope ?? 'personal'} kind={req.kind} movement={movement} onClose={closeSheet} />;
 }

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '../components/ui';
 import { todayISO } from '../lib/dates';
@@ -84,6 +84,9 @@ export function Areas() {
           <div className="sub">Cada parte de tu vida, con lo suyo</div>
         </div>
         <div className="actions">
+          <button className="icon-btn" aria-label="Buscar" onClick={() => navigate('/buscar')}>
+            <Search size={19} />
+          </button>
           <button className="icon-btn primary" aria-label="Añadir área" onClick={() => setAdding(true)}>
             <Plus size={20} />
           </button>

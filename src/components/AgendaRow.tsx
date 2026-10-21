@@ -2,7 +2,8 @@ import { Bell, MapPin, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { categoryInfo } from '../lib/categories';
 import { formatRelative, todayISO } from '../lib/dates';
-import { toggleEntryDone, updatePlanItem } from '../store/store';
+import { partnerName } from '../store/selectors';
+import { getState, toggleEntryDone, updatePlanItem } from '../store/store';
 import type { AgendaItem } from '../store/selectors';
 import type { Area, Entry } from '../store/types';
 import { openSheet } from './sheets';
@@ -23,6 +24,14 @@ export function AreaBadge({ area }: { area?: Area }) {
       {area.emoji} {area.name}
     </span>
   );
+}
+
+/** «👥 Con Leyre» en los planes en pareja. */
+export function SharedBadge() {
+  const s = getState();
+  if (!s.share) return null;
+  const partner = partnerName(s);
+  return <span className="badge tone-primary">👥 {partner ? `Con ${partner}` : 'En pareja'}</span>;
 }
 
 export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; area?: Area; showDate?: boolean; overdue?: boolean; trail?: ReactNode }) {
@@ -60,6 +69,7 @@ export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; a
             </span>
           )}
           {completable && cat && <span>{cat.emoji} {cat.label}</span>}
+          {e.shared && <SharedBadge />}
           {area && <AreaBadge area={area} />}
           {e.repeat !== 'none' && (
             <span aria-label="Se repite">

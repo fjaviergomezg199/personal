@@ -22,7 +22,7 @@ describe('migración de datos v1 → v3', () => {
   const s = normalizeState(v1);
 
   it('pasa la lista de la compra a la lista compartible', () => {
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(4);
     expect(s.listItems.filter((i) => i.list === 'compra').map((i) => [i.text, i.done])).toEqual([
       ['Leche', false],
       ['Pan', true],
@@ -62,7 +62,7 @@ describe('migración de datos v1 → v3', () => {
 describe('migración v2 → v3', () => {
   const v2 = {
     version: 2,
-    settings: { name: 'Leire', onboarded: true },
+    settings: { name: 'Leyre', onboarded: true },
     areas: [
       { id: 'h', name: 'Hogar', template: 'home', modules: ['shopping', 'chores', 'notes'], showOnToday: true, order: 0, emoji: '🏠', color: 'amber', createdAt: '', updatedAt: '' },
     ],
@@ -71,7 +71,7 @@ describe('migración v2 → v3', () => {
   const s = normalizeState(v2);
 
   it('añade la cuenta conjunta al hogar y un área de finanzas', () => {
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(4);
     expect(s.areas[0].modules).toEqual(['shopping', 'chores', 'jointMoney', 'notes']);
     const money = s.areas.find((a) => a.template === 'money')!;
     expect(money).toMatchObject({ name: 'Finanzas', modules: ['money', 'jointMoney', 'notes'], order: 1 });

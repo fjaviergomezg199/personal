@@ -34,12 +34,18 @@ export interface Entry {
   areaId?: ID;
   category?: string;
   done?: boolean;
+  /** Cuándo se marcó como hecho (para el resumen de la semana). */
+  doneAt?: string;
   /** Ocurrencias completadas de un elemento repetido. */
   doneDates?: ISODate[];
   important?: boolean;
   google?: GoogleLink;
   /** Pendiente de enviar a Google Calendar. */
   dirty?: boolean;
+  /** Plan en pareja: se comparte por el hogar compartido y lo ven los dos. */
+  shared?: boolean;
+  /** Quién lo cambió por última vez (en los compartidos). */
+  by?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,7 +78,8 @@ export type ModuleKey =
   | 'diary'
   | 'metrics'
   | 'money'
-  | 'jointMoney';
+  | 'jointMoney'
+  | 'habits';
 export type TemplateKey = 'studies' | 'running' | 'gym' | 'nutrition' | 'work' | 'home' | 'money' | 'custom';
 export type AreaColor = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
 
@@ -188,7 +195,7 @@ export interface ShareConfig {
   error?: string;
   /** Hora de la hoja en la última sincronización (para pedir solo lo nuevo). */
   since?: number;
-  /** Versión del código de la hoja (la 2 no comparte las finanzas). */
+  /** Versión del código de la hoja (la 2 no comparte las finanzas; la 3, los planes). */
   scriptVersion?: number;
 }
 
@@ -246,6 +253,23 @@ export interface MetricEntry {
   date: ISODate;
   value: number;
   note?: string;
+}
+
+/* ---------- Hábitos ---------- */
+
+export interface Habit {
+  id: ID;
+  name: string;
+  emoji: string;
+  /** Días en que toca (0 = lunes … 6 = domingo). Vacío = todos los días. */
+  days: number[];
+  /** Veces al día (8 vasos de agua). 1 = hecho o no. */
+  target: number;
+  unit?: string;
+  color: AreaColor;
+  order: number;
+  archived?: boolean;
+  createdAt: string;
 }
 
 /* ---------- Finanzas ---------- */
@@ -350,9 +374,44 @@ export interface GoogleSettings {
   lastSync?: string;
 }
 
+export type Accent = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'rose' | 'pink' | 'slate';
+export type Backdrop = 'warm' | 'neutral' | 'cool' | 'tinted';
+export type TextSize = 'normal' | 'large' | 'xlarge';
+/** Bloques de la pantalla Hoy (se pueden ordenar y ocultar). */
+export type TodaySection = 'dayview' | 'shopping' | 'overdue' | 'menu' | 'diary' | 'money' | 'habits' | 'week' | 'goals' | 'inbox' | 'upcoming';
+
+/** Copia automática en Google Drive (carpeta «Día a Día · copias»). */
+export interface DriveBackup {
+  on: boolean;
+  /** Última copia subida. */
+  last?: string;
+  /** Último intento (para no insistir si falla). */
+  tried?: string;
+  /** Día en que se recuperó una copia: ese día no se hace copia automática (no pisa la de hoy). */
+  skipDay?: string;
+  /** Huella de los datos de esa copia (si no cambian, no se sube otra). */
+  hash?: string;
+  /** Copias que hay en Drive. */
+  copies?: number;
+  error?: string;
+  /** Enlace para arreglarlo (activar la API de Drive…). */
+  errorLink?: string;
+}
+
 export interface Settings {
   name: string;
   theme: 'auto' | 'light' | 'dark';
+  /** Color principal de la app. */
+  accent?: Accent;
+  /** Tono del fondo. */
+  backdrop?: Backdrop;
+  textSize?: TextSize;
+  /** Emoji del saludo («Buenos días, Leyre 👋»). */
+  emoji?: string;
+  /** Orden y visibilidad de los bloques de Hoy. */
+  todayLayout?: { key: TodaySection; hidden?: boolean }[];
+  /** Semana (su lunes) cuyo resumen ya se cerró en Hoy. */
+  weekCardClosed?: ISODate;
   /** Aviso por defecto para elementos con hora (minutos). */
   defaultAlert: number | null;
   /** Aviso de cumpleaños (minutos antes de las 00:00 del día). */
@@ -360,11 +419,12 @@ export interface Settings {
   notifications: boolean;
   google: GoogleSettings;
   lastBackup?: string;
+  drive?: DriveBackup;
   onboarded: boolean;
 }
 
 export interface AppState {
-  version: 3;
+  version: 4;
   settings: Settings;
   entries: Entry[];
   birthdays: Birthday[];
@@ -382,10 +442,17 @@ export interface AppState {
   /** Ids de elementos de las listas cambiados aquí y aún no enviados. */
   listPending: ID[];
   share?: ShareConfig;
+  /** Planes en pareja cambiados aquí y aún no enviados. */
+  planPending: ID[];
+  /** Planes en pareja borrados aquí (para que se borren también en el otro móvil). */
+  planGone: { id: ID; at: number }[];
   foodLog: FoodLogItem[];
   customFoods: CustomFood[];
   nutritionTargets: NutritionTargets;
   metricTypes: MetricType[];
   metrics: MetricEntry[];
   finance: FinanceState;
+  habits: Habit[];
+  /** Hábito → día → veces hecho. */
+  habitLog: Record<ID, Record<ISODate, number>>;
 }

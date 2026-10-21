@@ -10,22 +10,27 @@ import { dueAlerts, showSystemNotification } from './lib/notify';
 import { nextOccurrence } from './lib/recurrence';
 import { navigate, useRoute } from './lib/router';
 import { syncShare } from './lib/shareSync';
-import { maybeAutoReconnect, runSync } from './lib/syncRunner';
+import { maybeAutoReconnect, runDriveBackup, runSync } from './lib/syncRunner';
 import { Agenda } from './screens/Agenda';
 import { AreaDetail } from './screens/AreaDetail';
 import { Areas } from './screens/Areas';
 import { Onboarding } from './screens/Onboarding';
+import { Search } from './screens/Search';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
+import { Week } from './screens/Week';
+import { DriveRestoreHost } from './sheets/DriveRestoreSheet';
 import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
+import type { Settings as SettingsT } from './store/types';
 
 export function App() {
   const state = useApp();
   const route = useRoute();
-  useTheme(state.settings.theme);
+  useAppearance(state.settings);
   useAlerts();
   useGoogleSync();
   useHomeShare();
+  useDriveBackup();
   useServiceWorker();
   const shared = useSharedText();
 
@@ -37,7 +42,9 @@ export function App() {
     return (
       <>
         <Onboarding />
+        <DriveRestoreHost />
         <Toaster />
+        <ConfirmHost />
       </>
     );
   }
@@ -48,6 +55,8 @@ export function App() {
   else if (section === 'areas' && sub) screen = <AreaDetail key={sub} id={sub} />;
   else if (section === 'areas') screen = <Areas />;
   else if (section === 'ajustes') screen = <Settings />;
+  else if (section === 'buscar') screen = <Search />;
+  else if (section === 'semana') screen = <Week />;
   else screen = <Today />;
 
   return (
@@ -56,26 +65,36 @@ export function App() {
       <TabBar />
       <GlobalSheets />
       {shared.text && <ShareSheet text={shared.text} onClose={shared.clear} />}
+      <DriveRestoreHost />
       <Toaster />
       <ConfirmHost />
     </div>
   );
 }
 
-function useTheme(theme: 'auto' | 'light' | 'dark') {
+/** Tema claro/oscuro, color principal, fondo y tamaño de letra. */
+function useAppearance(s: Pick<SettingsT, 'theme' | 'accent' | 'backdrop' | 'textSize'>) {
+  const { theme, accent, backdrop, textSize } = s;
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'auto') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
+    const set = (attr: string, value: string | undefined) => (value ? root.setAttribute(attr, value) : root.removeAttribute(attr));
+    set('data-theme', theme === 'auto' ? undefined : theme);
+    set('data-accent', accent && accent !== 'violet' ? accent : undefined);
+    set('data-backdrop', backdrop && backdrop !== 'warm' ? backdrop : undefined);
+    set('data-text', textSize && textSize !== 'normal' ? textSize : undefined);
+    // La barra del sistema, del color del fondo
     const apply = () => {
-      const dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-      document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#131312' : '#f5f3ee'));
+      let bg = getComputedStyle(document.body).backgroundColor;
+      // «color(srgb 0.9 0.93 0.92)» (de color-mix) → rgb(), que entiende la barra del sistema
+      const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(bg);
+      if (m) bg = `rgb(${m.slice(1, 4).map((v) => Math.round(Number(v) * 255)).join(', ')})`;
+      document.querySelectorAll('meta[name="theme-color"]').forEach((el) => el.setAttribute('content', bg));
     };
     apply();
     const mq = matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener?.('change', apply);
     return () => mq.removeEventListener?.('change', apply);
-  }, [theme]);
+  }, [theme, accent, backdrop, textSize]);
 }
 
 /** Avisos mientras la app está abierta (o al volver a ella). */
@@ -196,6 +215,21 @@ function useHomeShare() {
       clearInterval(poll);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onVisible);
+    };
+  }, []);
+}
+
+/** Copia en Google Drive: una al día si hay cambios (cuando hay permiso de Google; no hace falta tocar nada). */
+function useDriveBackup() {
+  useEffect(() => {
+    const tick = () => document.visibilityState === 'visible' && void runDriveBackup();
+    const first = setTimeout(tick, 8000);
+    const timer = setInterval(tick, 20 * 60000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
     };
   }, []);
 }

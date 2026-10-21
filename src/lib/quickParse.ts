@@ -24,6 +24,15 @@ const ACCENTS: Record<string, string> = {
   ó: 'o', ò: 'o', ö: 'o', ô: 'o', ú: 'u', ù: 'u', ü: 'u', û: 'u', ñ: 'n', ç: 'c',
 };
 
+/** «cena con Leyre el sábado», «en pareja», «juntos»: algo para compartir con la otra persona. */
+export function mentionsPartner(text: string, partner?: string): boolean {
+  const t = ` ${fold(text)} `;
+  if (/[^a-z0-9](?:en pareja|juntos|juntas)[^a-z0-9]/.test(t)) return true;
+  const p = partner ? fold(partner.trim().split(/\s+/)[0]) : '';
+  if (p.length < 2) return false;
+  return new RegExp(`[^a-z0-9]${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^a-z0-9]`).test(t);
+}
+
 /** Minúsculas y sin tildes conservando la longitud (para alinear índices). */
 export function fold(s: string): string {
   let out = '';

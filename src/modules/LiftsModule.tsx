@@ -43,7 +43,7 @@ export function LiftsModule({ area }: { area: Area }) {
                   </div>
                 </div>
                 {pct > 0 && pct <= 150 ? (
-                  <span className={`badge tone-${area.color}`} style={{ fontSize: 15 }}>
+                  <span className={`badge tone-${area.color}`} style={{ fontSize: 'calc(15px * var(--fs))' }}>
                     {formatKg(roundTo((l.rm * pct) / 100, rounding))} kg
                   </span>
                 ) : null}

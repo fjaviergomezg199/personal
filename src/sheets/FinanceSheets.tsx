@@ -32,7 +32,7 @@ export function PeriodSetup({ scope }: { scope: FinScope }) {
   };
   return (
     <div className="card">
-      <div style={{ fontWeight: 700, fontSize: 17 }}>{scope === 'hogar' ? '¿Cuándo empieza el mes en la cuenta conjunta?' : '¿Cuándo empieza tu mes?'}</div>
+      <div style={{ fontWeight: 700, fontSize: 'calc(17px * var(--fs))' }}>{scope === 'hogar' ? '¿Cuándo empieza el mes en la cuenta conjunta?' : '¿Cuándo empieza tu mes?'}</div>
       <p className="small muted" style={{ margin: '4px 0 12px' }}>
         {scope === 'hogar'
           ? 'Aquí el mes va de un cobro al siguiente (cuando entran las nóminas o las aportaciones), no del 1 al 30.'

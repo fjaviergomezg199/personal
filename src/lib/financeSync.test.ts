@@ -6,7 +6,7 @@ import { exchange } from './shareSync';
 import { fakeGoogle } from './testing/fakeGoogle';
 
 const mov = (p: Partial<Movement>): Movement => ({
-  id: 'M1', scope: 'hogar', kind: 'gasto', date: '2026-10-20', amount: 54.3, category: 'super', note: 'Mercadona', updatedAt: 1000, by: 'Leire', ...p,
+  id: 'M1', scope: 'hogar', kind: 'gasto', date: '2026-10-20', amount: 54.3, category: 'super', note: 'Mercadona', updatedAt: 1000, by: 'Leyre', ...p,
 });
 const fixed = (p: Partial<Recurring>): Recurring => ({
   id: 'F1', scope: 'hogar', kind: 'gasto', name: 'Hipoteca', amount: 750, category: 'hipoteca', day: 1, every: 1, from: '2026-09-25', active: true, updatedAt: 1000, ...p,
@@ -16,7 +16,7 @@ const fixed = (p: Partial<Recurring>): Recurring => ({
 async function sync(g: ReturnType<typeof fakeGoogle>, fin: FinanceState, opts: { full?: boolean; since?: number } = {}) {
   const out = financeOutbox(fin, 'yo');
   const server = await exchange(g.share, [], out.records, opts.full === false ? Math.max(0, (opts.since ?? 0) - 120000) : 0, g.fetchImpl);
-  expect(server.version).toBe(3);
+  expect(server.version).toBe(4);
   const m = mergeFinance(fin, out.sent, server.registros!, opts.full !== false);
   const next: FinanceState = { ...fin, movements: m.movements, recurring: m.recurring, pending: m.pending, accounts: { ...fin.accounts, hogar: m.hogar } };
   return { fin: next, since: server.ahora!, server };
@@ -36,7 +36,7 @@ describe('cuenta conjunta compartida', () => {
     const a = await sync(g, leire);
     expect(a.fin.pending).toEqual([]);
     // La hoja se puede leer: una fila por movimiento, en texto
-    expect(g.sheets.Movimientos[1].slice(0, 8)).toEqual(['M1', '2026-10-20', '54.3', 'gasto', 'super', 'Mercadona', '', 'Leire']);
+    expect(g.sheets.Movimientos[1].slice(0, 8)).toEqual(['M1', '2026-10-20', '54.3', 'gasto', 'super', 'Mercadona', '', 'Leyre']);
     // Lo personal no sale del móvil
     expect(g.sheets.Movimientos).toHaveLength(2);
 
@@ -119,6 +119,21 @@ describe('cuenta conjunta compartida', () => {
     const b = (await sync(g, emptyFinance())).fin;
     expect(b.recurring[0]).toMatchObject({ name: '=HYPERLINK("x")', skips: ['2026-11', '2027-01'], every: 2 });
     expect(b.movements[0]).toMatchObject({ note: '+34 600 000 000', recurringId: 'F1' });
+  });
+
+  it('si la hoja tiene una pestaña «Movimientos» vuestra, lo de la cuenta conjunta no se borra', async () => {
+    const g = fakeGoogle();
+    g.sheets.Movimientos = [['Fecha', 'Concepto', 'Importe'], ['1/10', 'Mío', '3']];
+    const a = emptyFinance();
+    a.movements.push(mov({}), mov({ id: 'M0', note: 'Ya enviado' }));
+    a.recurring.push(fixed({}));
+    a.pending = ['m:M1', 'f:F1'];
+    const r = await sync(g, a);
+    expect(r.server.bloqueados).toEqual(['Movimientos']);
+    expect(r.fin.movements.map((m) => m.id)).toEqual(['M1', 'M0']);
+    // Los fijos sí se guardaron; los movimientos esperan (también el que ya se había enviado)
+    expect(r.fin.pending.sort()).toEqual(['m:M0', 'm:M1']);
+    expect(g.sheets.Movimientos).toHaveLength(2);
   });
 
   it('con el código antiguo de la hoja, la cuenta conjunta se queda pendiente', async () => {

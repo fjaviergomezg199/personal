@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { formatRelative, todayISO } from '../lib/dates';
-import { parseQuick } from '../lib/quickParse';
+import { mentionsPartner, parseQuick } from '../lib/quickParse';
+import { partnerName } from '../store/selectors';
 import { addBirthday, addEntry, deleteBirthday, deleteEntry, useApp } from '../store/store';
 import type { EntryKind, HHMM, ID, ISODate } from '../store/types';
 import { Sheet, toast } from '../components/ui';
@@ -49,6 +50,8 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     repeat: parsed.repeat,
     category: parsed.category,
     alert: time ? (parsed.alert ?? (kind === 'task' ? null : defaultAlert)) : null,
+    // «cena con Leyre», «en pareja»…: se comparte (se puede quitar)
+    shared: !!state.share && mentionsPartner(text, partnerName(state)),
     ...manual,
   };
   if (draft.kind !== 'task' && !draft.date) draft.date = props.date ?? todayISO();
@@ -71,7 +74,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     } else {
       const id = addEntry({ ...draft, title: draft.title.trim(), kind: kind as EntryKind });
       const when = draft.date ? `${formatRelative(draft.date)}${draft.time ? ` · ${draft.time}` : ''}` : 'Sin fecha';
-      toast(`Guardado · ${when}`, { action: 'Deshacer', onAction: () => deleteEntry(id) });
+      toast(`${draft.shared ? '👥 ' : ''}Guardado · ${when}`, { action: 'Deshacer', onAction: () => deleteEntry(id) });
     }
     props.onClose();
   };
@@ -93,7 +96,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
         ref={inputRef}
         autoFocus
         className="textarea"
-        style={{ minHeight: 56, fontSize: 17 }}
+        style={{ minHeight: 56, fontSize: 'calc(17px * var(--fs))' }}
         rows={2}
         placeholder="¿Qué quieres apuntar? Ej.: mañana a las 10 dentista"
         value={text}

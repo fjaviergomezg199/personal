@@ -10,7 +10,7 @@ import { dueAlerts, showSystemNotification } from './lib/notify';
 import { nextOccurrence } from './lib/recurrence';
 import { navigate, useRoute } from './lib/router';
 import { syncShare } from './lib/shareSync';
-import { maybeAutoReconnect, runSync } from './lib/syncRunner';
+import { maybeAutoReconnect, runDriveBackup, runSync } from './lib/syncRunner';
 import { Agenda } from './screens/Agenda';
 import { AreaDetail } from './screens/AreaDetail';
 import { Areas } from './screens/Areas';
@@ -18,6 +18,7 @@ import { Onboarding } from './screens/Onboarding';
 import { Search } from './screens/Search';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
+import { DriveRestoreHost } from './sheets/DriveRestoreSheet';
 import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
 import type { Settings as SettingsT } from './store/types';
 
@@ -28,6 +29,7 @@ export function App() {
   useAlerts();
   useGoogleSync();
   useHomeShare();
+  useDriveBackup();
   useServiceWorker();
   const shared = useSharedText();
 
@@ -39,7 +41,9 @@ export function App() {
     return (
       <>
         <Onboarding />
+        <DriveRestoreHost />
         <Toaster />
+        <ConfirmHost />
       </>
     );
   }
@@ -59,6 +63,7 @@ export function App() {
       <TabBar />
       <GlobalSheets />
       {shared.text && <ShareSheet text={shared.text} onClose={shared.clear} />}
+      <DriveRestoreHost />
       <Toaster />
       <ConfirmHost />
     </div>
@@ -208,6 +213,21 @@ function useHomeShare() {
       clearInterval(poll);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onVisible);
+    };
+  }, []);
+}
+
+/** Copia en Google Drive: una al día si hay cambios (cuando hay permiso de Google; no hace falta tocar nada). */
+function useDriveBackup() {
+  useEffect(() => {
+    const tick = () => document.visibilityState === 'visible' && void runDriveBackup();
+    const first = setTimeout(tick, 8000);
+    const timer = setInterval(tick, 20 * 60000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
     };
   }, []);
 }

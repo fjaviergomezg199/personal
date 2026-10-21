@@ -241,7 +241,7 @@ img { max-width: 100%; }
 .icon-btn.plain { background: none; color: var(--text-2); }
 .icon-btn.small { width: 32px; height: 32px; }
 .icon-btn.primary { background: var(--primary); color: var(--primary-ink); }
-.btn-row { display: flex; gap: 10px; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-row > * { flex: 1; }
 
 /* ---------- Formularios ---------- */

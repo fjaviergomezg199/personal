@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { toast } from '../components/ui';
 import { getState } from '../store/store';
-import { beginGoogleAuth, canAutoAuth, hasValidToken, recordAutoAuth, resetAutoAuth, type RedirectResult } from './google';
+import { backupToDrive, driveBackupDue, driveBackupOverdue, setDriveRestoreOpen } from './driveBackup';
+import { beginGoogleAuth, canAutoAuth, DRIVE_SCOPE, hasScope, hasValidToken, recordAutoAuth, resetAutoAuth, type AfterAuth, type RedirectResult } from './google';
 import { pendingGoogleChanges, syncGoogle } from './sync';
 
 /** Orquesta la sincronización con Google y su estado para la interfaz. */
@@ -41,12 +42,37 @@ export function googleLinked(): boolean {
   return googleConfigured() && !!g.email;
 }
 
-export function connectGoogle(opts: { silentFirst?: boolean } = {}) {
+/** Con la copia en Drive activada, el permiso de Google incluye Drive. */
+const wantsDrive = () => !!getState().settings.drive?.on;
+
+export function connectGoogle(opts: { silentFirst?: boolean; then?: AfterAuth } = {}) {
   const g = getState().settings.google;
   if (!g.clientId) return;
   resetAutoAuth();
-  if (opts.silentFirst && g.email) beginGoogleAuth(g.clientId, { silent: true, email: g.email, fallback: true });
-  else beginGoogleAuth(g.clientId, { email: g.email });
+  const drive = wantsDrive() || !!opts.then;
+  if (opts.silentFirst && g.email) beginGoogleAuth(g.clientId, { silent: true, email: g.email, fallback: true, drive, then: opts.then });
+  else beginGoogleAuth(g.clientId, { email: g.email, drive, then: opts.then });
+}
+
+/** Copia en Drive. A mano (`manual`) se hace aunque no haya cambios y se avisa de cómo ha ido. */
+export async function runDriveBackup(opts: { manual?: boolean } = {}) {
+  if (!opts.manual && !driveBackupDue()) return;
+  if (!hasScope(DRIVE_SCOPE)) {
+    if (opts.manual) connectGoogle({ silentFirst: true, then: 'drive-backup' });
+    return;
+  }
+  const r = await backupToDrive({ force: opts.manual });
+  if (!opts.manual) return;
+  if (r.status === 'ok') toast(`Copia guardada en tu Google Drive ✓${r.uploaded ? ` (y ${r.uploaded === 1 ? '1 archivo' : `${r.uploaded} archivos`})` : ''}`);
+  else if (r.status === 'needs-auth') connectGoogle({ then: 'drive-backup' });
+  else if (r.status === 'offline') toast('Sin conexión: la copia se hará cuando vuelva internet.');
+  else if (r.status === 'error') toast(r.message, { duration: 7000 });
+}
+
+/** Elegir una copia de Drive para recuperarla (pidiendo antes el permiso si hace falta). */
+export function startDriveRestore() {
+  if (hasScope(DRIVE_SCOPE)) setDriveRestoreOpen(true);
+  else connectGoogle({ silentFirst: true, then: 'drive-restore' });
 }
 
 export async function runSync(opts: { manual?: boolean } = {}) {
@@ -75,14 +101,21 @@ export function handleRedirectResult(r: RedirectResult) {
   if (r.status === 'ok') {
     resetAutoAuth();
     set({ needsAuth: false });
+    if (r.then === 'drive-restore') setDriveRestoreOpen(true);
     void runSync().then(() => {
-      if (!status.error) toast('Conectado con Google Calendar ✓');
+      if (r.then === 'drive-backup') void runDriveBackup({ manual: true });
+      else if (!r.then && !status.error) toast('Conectado con Google Calendar ✓');
+      if (!r.then) void runDriveBackup();
     });
     return;
   }
   if (r.silent && r.fallback && g.clientId) {
     // Lo pidió la persona: si la renovación silenciosa falla, mostramos Google.
-    beginGoogleAuth(g.clientId, { email: r.email });
+    beginGoogleAuth(g.clientId, { email: r.email, drive: r.drive, then: r.then });
+    return;
+  }
+  if (r.then && !r.silent) {
+    toast(r.error === 'access_denied' ? 'Sin el permiso de Google Drive no se puede guardar la copia allí.' : 'No se pudo conectar con Google Drive.', { duration: 7000 });
     return;
   }
   if (r.silent) {
@@ -98,14 +131,14 @@ export function handleRedirectResult(r: RedirectResult) {
   toast(msg[r.error] ?? `No se pudo conectar con Google (${r.error}). Revisa el ID de cliente en Ajustes.`, { duration: 7000 });
 }
 
-/** Renueva el permiso (rebote rápido a Google) solo si hay algo que enviar. */
+/** Renueva el permiso (rebote rápido a Google) solo si hay algo que enviar o hace días que no hay copia en Drive. */
 export function maybeAutoReconnect(): boolean {
   const g = getState().settings.google;
   if (!googleLinked() || !g.autoReconnect || hasValidToken()) return false;
-  if (pendingGoogleChanges() === 0 || !canAutoAuth()) return false;
+  if ((pendingGoogleChanges() === 0 && !driveBackupOverdue()) || !canAutoAuth()) return false;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
   if (document.visibilityState !== 'visible') return false;
   recordAutoAuth(false);
-  beginGoogleAuth(g.clientId, { silent: true, email: g.email });
+  beginGoogleAuth(g.clientId, { silent: true, email: g.email, drive: wantsDrive() });
   return true;
 }

@@ -1,7 +1,7 @@
 /**
- * Google Calendar sin servidor: OAuth 2.0 "implícito" con redirección en la
- * misma ventana (funciona dentro de la app instalada en iPhone y Android) y
- * llamadas directas a la API de Calendar.
+ * Google Calendar (y la copia en Drive) sin servidor: OAuth 2.0 "implícito" con
+ * redirección en la misma ventana (funciona dentro de la app instalada en iPhone
+ * y Android) y llamadas directas a las APIs de Google.
  */
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -10,6 +10,8 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.readonly',
 ];
+/** Solo los archivos que crea la app (la carpeta de copias), no el resto del Drive. */
+export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_KEY = 'diaadia:gtoken';
 const PENDING_KEY = 'diaadia:gauth';
 const AUTO_KEY = 'diaadia:gauto';
@@ -23,11 +25,15 @@ export class GoogleAuthError extends Error {
 export class GoogleApiError extends Error {
   constructor(
     public status: number,
-    body: string,
+    public body: string,
+    service = 'Google Calendar',
   ) {
-    super(`Google Calendar respondió ${status}: ${body.slice(0, 200)}`);
+    super(`${service} respondió ${status}: ${body.slice(0, 200)}`);
   }
 }
+
+/** Qué hacer al volver de Google (si se fue a pedir permiso para algo concreto). */
+export type AfterAuth = 'drive-backup' | 'drive-restore';
 
 /** URL base de la app (la que hay que registrar como URI de redirección). */
 export function appBaseUrl(): string {
@@ -44,6 +50,8 @@ export function appOrigin(): string {
 interface StoredToken {
   token: string;
   expiresAt: number;
+  /** Permisos concedidos (los tokens antiguos no lo guardaban: solo Calendar). */
+  scopes?: string[];
 }
 
 export function getToken(): StoredToken | null {
@@ -59,23 +67,31 @@ export function hasValidToken(): boolean {
   return getToken() !== null;
 }
 
+export function hasScope(scope: string): boolean {
+  const t = getToken();
+  return !!t && (t.scopes ?? GOOGLE_SCOPES).includes(scope);
+}
+
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-/** Va a Google para pedir permiso (o renovarlo sin pantallas si `silent`). */
-export function beginGoogleAuth(clientId: string, opts: { silent?: boolean; email?: string; fallback?: boolean } = {}): void {
+/** Va a Google para pedir permiso (o renovarlo sin pantallas si `silent`). Con `drive`, también para la copia en Drive. */
+export function beginGoogleAuth(
+  clientId: string,
+  opts: { silent?: boolean; email?: string; fallback?: boolean; drive?: boolean; then?: AfterAuth } = {},
+): void {
   const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const route = location.hash && !/access_token|error=/.test(location.hash) ? location.hash : '#/hoy';
   localStorage.setItem(
     PENDING_KEY,
-    JSON.stringify({ state, route, silent: !!opts.silent, fallback: !!opts.fallback, email: opts.email, at: Date.now() }),
+    JSON.stringify({ state, route, silent: !!opts.silent, fallback: !!opts.fallback, email: opts.email, drive: !!opts.drive, then: opts.then, at: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: clientId.trim(),
     redirect_uri: appBaseUrl(),
     response_type: 'token',
-    scope: GOOGLE_SCOPES.join(' '),
+    scope: [...GOOGLE_SCOPES, ...(opts.drive ? [DRIVE_SCOPE] : [])].join(' '),
     include_granted_scopes: 'true',
     state,
   });
@@ -85,15 +101,15 @@ export function beginGoogleAuth(clientId: string, opts: { silent?: boolean; emai
 }
 
 export type RedirectResult =
-  | { status: 'ok' }
-  | { status: 'error'; error: string; silent: boolean; fallback: boolean; email?: string };
+  | { status: 'ok'; then?: AfterAuth }
+  | { status: 'error'; error: string; silent: boolean; fallback: boolean; email?: string; drive?: boolean; then?: AfterAuth };
 
 /** Al arrancar: procesa la vuelta de Google (#access_token=... o #error=...). */
 export function consumeGoogleRedirect(): RedirectResult | null {
   const hash = location.hash.replace(/^#\/?/, '');
   if (!/(^|&)(access_token|error)=/.test(hash)) return null;
   const params = new URLSearchParams(hash);
-  let pending: { state: string; route: string; silent: boolean; fallback: boolean; email?: string } | null = null;
+  let pending: { state: string; route: string; silent: boolean; fallback: boolean; email?: string; drive?: boolean; then?: AfterAuth } | null = null;
   try {
     pending = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null');
   } catch {
@@ -105,12 +121,14 @@ export function consumeGoogleRedirect(): RedirectResult | null {
     return { status: 'error', error: 'state_mismatch', silent: false, fallback: false };
   }
   const error = params.get('error');
-  if (error) return { status: 'error', error, silent: pending.silent, fallback: pending.fallback, email: pending.email };
+  if (error) return { status: 'error', error, silent: pending.silent, fallback: pending.fallback, email: pending.email, drive: pending.drive, then: pending.then };
   const token = params.get('access_token');
-  if (!token) return { status: 'error', error: 'no_token', silent: pending.silent, fallback: false };
+  if (!token) return { status: 'error', error: 'no_token', silent: pending.silent, fallback: false, then: pending.then };
   const expiresIn = Number(params.get('expires_in') ?? 3600);
-  localStorage.setItem(TOKEN_KEY, JSON.stringify({ token, expiresAt: Date.now() + (expiresIn - 120) * 1000 }));
-  return { status: 'ok' };
+  const scopes = (params.get('scope') ?? '').split(/\s+/).filter(Boolean);
+  const stored: StoredToken = { token, expiresAt: Date.now() + (expiresIn - 120) * 1000, ...(scopes.length ? { scopes } : {}) };
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(stored));
+  return { status: 'ok', then: pending.then };
 }
 
 /** Control para no rebotar a Google en bucle al abrir la app. */
@@ -133,19 +151,22 @@ export function resetAutoAuth(): void {
   localStorage.removeItem(AUTO_KEY);
 }
 
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Petición a una API de Google con el permiso guardado. */
+export async function googleFetch(url: string, init: RequestInit = {}, service?: string): Promise<Response> {
   const t = getToken();
   if (!t) throw new GoogleAuthError();
-  const res = await fetch(API + path, {
-    ...init,
-    headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-  });
+  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${t.token}`, ...(init.headers ?? {}) } });
   if (res.status === 401) {
     clearToken();
     throw new GoogleAuthError();
   }
+  if (!res.ok) throw new GoogleApiError(res.status, await res.text(), service);
+  return res;
+}
+
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await googleFetch(API + path, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
   if (res.status === 204) return undefined as T;
-  if (!res.ok) throw new GoogleApiError(res.status, await res.text());
   return (await res.json()) as T;
 }
 

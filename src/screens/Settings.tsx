@@ -1,13 +1,14 @@
-import { Bell, CalendarCheck, Copy, Download, RefreshCw, Smartphone, Upload, Users } from 'lucide-react';
+import { Bell, CalendarCheck, CloudDownload, CloudUpload, Copy, Download, RefreshCw, Smartphone, Upload, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { confirmDialog, SectionHead, Switch, toast } from '../components/ui';
 import { exportBackup, importBackup } from '../lib/backup';
-import { formatAlert, formatRelative, toISODate } from '../lib/dates';
+import { formatAlert, formatRelative, toHHMM, toISODate } from '../lib/dates';
+import { DRIVE_FOLDER, KEEP_COPIES, useDriveRunning } from '../lib/driveBackup';
 import { copyText } from '../lib/files';
-import { appBaseUrl, appOrigin, clearToken, hasValidToken } from '../lib/google';
+import { appBaseUrl, appOrigin, clearToken, DRIVE_SCOPE, hasScope, hasValidToken } from '../lib/google';
 import { notificationPermission, requestNotificationPermission, showSystemNotification } from '../lib/notify';
 import { pendingGoogleChanges } from '../lib/sync';
-import { connectGoogle, runSync, useSyncStatus } from '../lib/syncRunner';
+import { connectGoogle, runDriveBackup, runSync, startDriveRestore, useSyncStatus } from '../lib/syncRunner';
 import { kv, requestPersistence } from '../store/db';
 import { createInitialState, replaceState, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
@@ -54,6 +55,7 @@ export function Settings() {
 
       <div className="section">
         <SectionHead title="Copia de seguridad" />
+        <DriveBackupCard />
         <BackupCard />
       </div>
 
@@ -325,7 +327,11 @@ function GoogleSetup({ clientId, setClientId, onSave }: { clientId: string; setC
             <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">
               Google Calendar API
             </a>{' '}
-            (botón «Habilitar»).
+            y la{' '}
+            <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer">
+              Google Drive API
+            </a>{' '}
+            (botón «Habilitar» en cada una; Drive es para la copia de seguridad).
           </li>
           <li>
             En <b>Google Auth Platform</b> → «Comenzar»: nombre de la app, tu correo y tipo <b>Externo</b>.
@@ -364,14 +370,85 @@ function GoogleSetup({ clientId, setClientId, onSave }: { clientId: string; setC
   );
 }
 
+/** «hoy a las 09:12», «ayer a las 21:40», «el lunes a las…» */
+function when(isoTime: string): string {
+  const d = new Date(isoTime);
+  const rel = formatRelative(toISODate(d)).toLowerCase();
+  return `${/^(hoy|ayer)$/.test(rel) ? rel : `el ${rel}`} a las ${toHHMM(d)}`;
+}
+
+function DriveBackupCard() {
+  const state = useApp();
+  const drive = state.settings.drive;
+  const running = useDriveRunning();
+  const clientId = state.settings.google.clientId;
+  return (
+    <div className="card">
+      <Switch
+        checked={!!drive?.on}
+        label="Copia automática en Google Drive"
+        description={`Cada día que haya cambios se guarda una copia en la carpeta «${DRIVE_FOLDER}» de tu Drive (las ${KEEP_COPIES} últimas). Solo la ve tu cuenta.`}
+        onChange={(on) => {
+          if (on && !clientId) {
+            toast('Primero configura Google (arriba, en «Google Calendar»).', { duration: 6000 });
+            return;
+          }
+          updateSettings({ drive: { ...(drive ?? {}), on } });
+          if (on) void runDriveBackup({ manual: true });
+        }}
+      />
+      {drive?.on && (
+        <div className="small" style={{ margin: '2px 0 10px' }}>
+          {running ? (
+            <span className="muted">⏳ Guardando la copia…</span>
+          ) : drive.error ? (
+            <div className="callout" style={{ background: 'var(--warning-soft)' }}>
+              ⚠️ {drive.error}
+              {drive.errorLink && (
+                <div className="mt8">
+                  <a className="btn small secondary" href={drive.errorLink} target="_blank" rel="noopener noreferrer">
+                    Activar la API de Google Drive
+                  </a>
+                  <div className="tiny muted mt8">Luego vuelve aquí y pulsa «Copiar ahora».</div>
+                </div>
+              )}
+            </div>
+          ) : drive.last ? (
+            <span className="muted">
+              ✓ Última copia {when(drive.last)}
+              {drive.copies ? ` · ${drive.copies === 1 ? '1 copia' : `${drive.copies} copias`} en tu Drive` : ''}
+            </span>
+          ) : !hasScope(DRIVE_SCOPE) ? (
+            <span style={{ color: 'var(--warning)' }}>Falta dar permiso a Google Drive: pulsa «Copiar ahora».</span>
+          ) : (
+            <span className="muted">Aún no hay ninguna copia en Drive.</span>
+          )}
+        </div>
+      )}
+      {clientId && (
+        <div className="btn-row">
+          {drive?.on && (
+            <button className="btn secondary small" disabled={running} onClick={() => void runDriveBackup({ manual: true })}>
+              <CloudUpload size={16} /> Copiar ahora
+            </button>
+          )}
+          <button className="btn secondary small" onClick={startDriveRestore}>
+            <CloudDownload size={16} /> Recuperar de Drive
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BackupCard() {
   const state = useApp();
   const input = useRef<HTMLInputElement>(null);
   const last = state.settings.lastBackup;
   return (
-    <div className="card">
+    <div className="card mt12">
       <p className="small muted" style={{ marginTop: 0 }}>
-        Tus datos viven en este móvil. Descarga una copia de vez en cuando (por ejemplo, en Archivos o en Drive) para no perder nada si cambias de móvil.
+        También puedes guardar tú una copia en un archivo (en Archivos, en el ordenador…) y restaurarla en otro móvil.
       </p>
       <div className="btn-row">
         <button className="btn secondary small" onClick={() => void exportBackup()}>
@@ -454,8 +531,9 @@ function HomeShareCard() {
     <div className="card">
       <p className="small muted" style={{ marginTop: 0 }}>
         {share
-          ? share.error ?? `Lista de la compra y tareas de casa compartidas.${share.lastSync ? ` Última sincronización: ${new Date(share.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.` : ''}`
-          : 'Comparte la lista de la compra y las tareas de casa con tu pareja: lo que uno apunta, el otro lo ve.'}
+          ? share.error ??
+            `Compartís la compra, las tareas de casa, la cuenta conjunta y los planes en pareja.${share.lastSync ? ` Última sincronización: ${new Date(share.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.` : ''}`
+          : 'Comparte con tu pareja la lista de la compra, las tareas de casa, la cuenta conjunta y los planes: lo que uno apunta, el otro lo ve.'}
       </p>
       <button className="btn secondary small" onClick={() => setOpen(true)}>
         <Users size={16} /> {share ? 'Código para tu pareja y opciones' : 'Configurar hogar compartido'}

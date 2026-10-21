@@ -378,6 +378,24 @@ export type TextSize = 'normal' | 'large' | 'xlarge';
 /** Bloques de la pantalla Hoy (se pueden ordenar y ocultar). */
 export type TodaySection = 'dayview' | 'shopping' | 'overdue' | 'menu' | 'diary' | 'money' | 'habits' | 'week' | 'goals' | 'inbox' | 'upcoming';
 
+/** Copia automática en Google Drive (carpeta «Día a Día · copias»). */
+export interface DriveBackup {
+  on: boolean;
+  /** Última copia subida. */
+  last?: string;
+  /** Último intento (para no insistir si falla). */
+  tried?: string;
+  /** Día en que se recuperó una copia: ese día no se hace copia automática (no pisa la de hoy). */
+  skipDay?: string;
+  /** Huella de los datos de esa copia (si no cambian, no se sube otra). */
+  hash?: string;
+  /** Copias que hay en Drive. */
+  copies?: number;
+  error?: string;
+  /** Enlace para arreglarlo (activar la API de Drive…). */
+  errorLink?: string;
+}
+
 export interface Settings {
   name: string;
   theme: 'auto' | 'light' | 'dark';
@@ -397,6 +415,7 @@ export interface Settings {
   notifications: boolean;
   google: GoogleSettings;
   lastBackup?: string;
+  drive?: DriveBackup;
   onboarded: boolean;
 }
 

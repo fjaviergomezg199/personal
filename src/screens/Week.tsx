@@ -243,7 +243,7 @@ export function Week() {
                 </div>
               ))}
             </div>
-            <div className="hh-legend mt12" aria-hidden>
+            <div className="hh-legend week-legend mt12" aria-hidden>
               <span>
                 <i className="hh-cell done" /> Hecho
               </span>

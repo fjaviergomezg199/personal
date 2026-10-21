@@ -774,7 +774,8 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .week-habits { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, 18px) auto; gap: 7px 5px; align-items: center; }
 .week-habits .wh-day { text-align: center; font-size: calc(11px * var(--fs)); font-weight: 650; color: var(--text-3); }
 .week-habits .wh-row { display: contents; }
-.week-habits .wh-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(14.5px * var(--fs)); }
+.week-habits .wh-name { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; font-size: calc(14.5px * var(--fs)); }
 .week-habits .hh-cell { height: 18px; }
 .week-habits .wh-count { font-size: calc(13px * var(--fs)); font-variant-numeric: tabular-nums; text-align: right; min-width: 2.6em; }
 .fin-stats.week-tiles { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); }
+.week-legend { --tone: var(--text-2); }

@@ -15,6 +15,7 @@ import { Agenda } from './screens/Agenda';
 import { AreaDetail } from './screens/AreaDetail';
 import { Areas } from './screens/Areas';
 import { Onboarding } from './screens/Onboarding';
+import { Search } from './screens/Search';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
 import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
@@ -49,6 +50,7 @@ export function App() {
   else if (section === 'areas' && sub) screen = <AreaDetail key={sub} id={sub} />;
   else if (section === 'areas') screen = <Areas />;
   else if (section === 'ajustes') screen = <Settings />;
+  else if (section === 'buscar') screen = <Search />;
   else screen = <Today />;
 
   return (

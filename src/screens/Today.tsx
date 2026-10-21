@@ -1,4 +1,4 @@
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Search } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AgendaRow, EntryRow } from '../components/AgendaRow';
 import { DayView } from '../components/DayView';
@@ -12,11 +12,11 @@ import { currentPeriod, daysLeft, eur, eurInt, occurrencesIn, payDue, summarizeP
 import { sumMacros } from '../lib/foods';
 import { HabitsToday } from '../modules/HabitsModule';
 import { MovementSheet } from '../sheets/MovementSheet';
-import type { TodaySection } from '../store/types';
+import type { ModuleKey, TodaySection } from '../store/types';
 import { resolveLayout } from '../lib/todayLayout';
 import { useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
-import { useApp } from '../store/store';
+import { getState, useApp } from '../store/store';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
 
 export function Today() {
@@ -32,6 +32,7 @@ export function Today() {
   // Enlaces directos: #/hoy?nuevo=1, #/hoy?ver=<id> (desde un aviso)
   const ver = route.query.get('ver');
   const nuevo = route.query.get('nuevo');
+  const accion = route.query.get('accion');
   useEffect(() => {
     if (ver) {
       clearQuery('ver');
@@ -39,8 +40,21 @@ export function Today() {
     } else if (nuevo) {
       clearQuery('nuevo');
       openSheet({ type: 'quick' });
+    } else if (accion) {
+      // Atajos del icono de la app
+      clearQuery('accion');
+      const s = getState();
+      const area = (m: ModuleKey) => sortedAreas(s).find((a) => a.modules.includes(m));
+      if (accion === 'gasto') openSheet({ type: 'movement', scope: 'personal', kind: 'gasto' });
+      else if (accion === 'compra') {
+        const a = area('shopping');
+        navigate(a ? `/areas/${a.id}?bloque=shopping` : '/areas');
+      } else if (accion === 'comida') {
+        const a = area('diary');
+        navigate(a ? `/areas/${a.id}?bloque=diary&nuevo=1` : '/areas');
+      } else if (accion === 'buscar') navigate('/buscar');
     }
-  }, [ver, nuevo]);
+  }, [ver, nuevo, accion]);
 
   const areas = useMemo(() => areaMap(state), [state]);
   const items = useMemo(() => agendaForDate(state, today, areas), [state, today, areas]);
@@ -193,6 +207,9 @@ export function Today() {
           <div className="sub">{capitalize(formatLong(today))}</div>
         </div>
         <div className="actions">
+          <button className="icon-btn" aria-label="Buscar" onClick={() => navigate('/buscar')}>
+            <Search size={19} />
+          </button>
           <GoogleStatusButton />
         </div>
       </div>

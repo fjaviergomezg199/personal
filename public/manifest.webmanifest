@@ -39,12 +39,63 @@
     {
       "name": "Añadir algo",
       "short_name": "Añadir",
-      "url": "./#/hoy?nuevo=1"
+      "description": "Recordatorio, plan, tarea o cumpleaños",
+      "url": "./#/hoy?nuevo=1",
+      "icons": [
+        {
+          "src": "icons/sc-nuevo.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     },
     {
-      "name": "Mi semana",
-      "short_name": "Semana",
-      "url": "./#/agenda"
+      "name": "Añadir un gasto",
+      "short_name": "Gasto",
+      "url": "./#/hoy?accion=gasto",
+      "icons": [
+        {
+          "src": "icons/sc-gasto.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Lista de la compra",
+      "short_name": "Compra",
+      "url": "./#/hoy?accion=compra",
+      "icons": [
+        {
+          "src": "icons/sc-compra.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Apuntar lo que he comido",
+      "short_name": "Comida",
+      "url": "./#/hoy?accion=comida",
+      "icons": [
+        {
+          "src": "icons/sc-comida.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Buscar",
+      "short_name": "Buscar",
+      "url": "./#/buscar",
+      "icons": [
+        {
+          "src": "icons/sc-buscar.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "share_target": {

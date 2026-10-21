@@ -43,9 +43,9 @@ export const TEMPLATES: TemplateInfo[] = [
     name: 'Nutrición',
     emoji: '🥗',
     color: 'green',
-    modules: ['menu', 'tasks', 'docs', 'goals', 'notes'],
-    labels: { menu: 'Menú semanal', tasks: 'Lista de la compra' },
-    description: 'Lo que toca comer cada día, el PDF de la nutri y la compra.',
+    modules: ['menu', 'diary', 'metrics', 'shopping', 'docs', 'goals', 'notes'],
+    labels: { menu: 'Menú semanal' },
+    description: 'El menú de la nutri, calorías y macros de lo que comes, tu peso y la compra.',
   },
   {
     key: 'work',
@@ -58,12 +58,11 @@ export const TEMPLATES: TemplateInfo[] = [
   },
   {
     key: 'home',
-    name: 'Casa',
+    name: 'Hogar',
     emoji: '🏠',
     color: 'amber',
-    modules: ['tasks', 'notes'],
-    labels: { tasks: 'Tareas de casa' },
-    description: 'Tareas de casa, recados y cosas pendientes.',
+    modules: ['shopping', 'chores', 'notes'],
+    description: 'Lista de la compra y tareas de casa, compartidas entre los dos móviles.',
   },
   {
     key: 'custom',
@@ -87,13 +86,17 @@ export const MODULE_INFO: Record<ModuleKey, { label: string; emoji: string; desc
   menu: { label: 'Menú semanal', emoji: '🍽️', description: 'Qué toca comer cada día de la semana.' },
   lifts: { label: 'RM y porcentajes', emoji: '💪', description: 'Tus marcas y los kilos de cada porcentaje.' },
   notes: { label: 'Notas', emoji: '📝', description: 'Un bloc de notas libre.' },
+  shopping: { label: 'Lista de la compra', emoji: '🛒', description: 'Una sola lista de la compra, que podéis compartir los dos.' },
+  chores: { label: 'Tareas de casa', emoji: '🧹', description: 'Lo que hay que hacer en casa, compartido si queréis.' },
+  diary: { label: 'Calorías y macros', emoji: '🔥', description: 'Apunta lo que comes con cantidades: calorías, proteína, hidratos y grasa.' },
+  metrics: { label: 'Peso y medidas', emoji: '⚖️', description: 'Tu peso (y otras medidas) con la gráfica de cómo evoluciona.' },
 };
 
 export function moduleLabel(area: Pick<Area, 'labels'>, m: ModuleKey): string {
   return area.labels?.[m] ?? MODULE_INFO[m].label;
 }
 
-export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
+export const MODULE_ORDER: ModuleKey[] = ['plan', 'menu', 'diary', 'metrics', 'shopping', 'chores', 'tasks', 'lifts', 'goals', 'docs', 'notes'];
 
 export const AREA_COLORS: AreaColor[] = ['violet', 'blue', 'teal', 'green', 'amber', 'orange', 'rose', 'pink', 'slate'];
 

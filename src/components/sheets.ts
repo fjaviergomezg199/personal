@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import type { EntryKind, GoogleEvent, ID, ISODate } from '../store/types';
+import type { EntryKind, GoogleEvent, HHMM, ID, ISODate } from '../store/types';
 
 /** Hojas globales que se pueden abrir desde cualquier pantalla. */
 export type SheetRequest =
-  | { type: 'quick'; date?: ISODate; areaId?: ID; kind?: EntryKind | 'birthday'; text?: string }
+  | { type: 'quick'; date?: ISODate; time?: HHMM; areaId?: ID; kind?: EntryKind | 'birthday'; text?: string }
   | { type: 'entry'; id: ID; date?: ISODate }
   | { type: 'birthday'; id?: ID }
   | { type: 'plan'; id: ID }

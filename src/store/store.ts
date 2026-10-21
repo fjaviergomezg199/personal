@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from 'react';
 import { addDays, todayISO, weekKey, monthKey } from '../lib/dates';
 import { aliasesFor } from '../lib/lifts';
+import { fold } from '../lib/quickParse';
 import { DEFAULT_MEALS } from '../lib/importers';
 import { files, kv } from './db';
 import { templateInfo } from './templates';
 import type {
-  AppState, Area, Birthday, DocMeta, Entry, Goal, GoogleCalendarInfo, GoogleEvent, GoogleSettings, ID,
-  ISODate, Lift, Menu, PlanItem, Settings, TemplateKey,
+  AppState, Area, Birthday, CustomFood, DocMeta, Entry, FoodLogItem, Goal, GoogleCalendarInfo, GoogleEvent, GoogleSettings, ID,
+  ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, NutritionTargets, PlanItem, Settings, ShareConfig,
+  TemplateKey,
 } from './types';
 
 export function uid(): ID {
@@ -19,9 +21,11 @@ export function uid(): ID {
 
 const nowIso = () => new Date().toISOString();
 
+export const DEFAULT_METRICS: MetricType[] = [{ id: 'peso', name: 'Peso', unit: 'kg', decimals: 1 }];
+
 export function createInitialState(): AppState {
   return {
-    version: 1,
+    version: 2,
     settings: {
       name: '',
       theme: 'auto',
@@ -48,6 +52,13 @@ export function createInitialState(): AppState {
     googleCalendars: [],
     googleDeletes: [],
     notified: {},
+    listItems: [],
+    listPending: [],
+    foodLog: [],
+    customFoods: [],
+    nutritionTargets: {},
+    metricTypes: DEFAULT_METRICS.map((m) => ({ ...m })),
+    metrics: [],
   };
 }
 
@@ -58,10 +69,10 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
   const settings: Settings = { ...base.settings, ...(raw.settings ?? {}) };
   settings.google = { ...base.settings.google, ...(raw.settings?.google ?? {}) } as GoogleSettings;
   if (!settings.google.clientId) settings.google.clientId = base.settings.google.clientId;
-  return {
+  const s: AppState = {
     ...base,
     ...raw,
-    version: 1,
+    version: 2,
     settings,
     entries: (raw.entries ?? []).map((e) => ({ repeat: 'none', alert: null, ...(e as Partial<Entry>) }) as Entry),
     birthdays: raw.birthdays ?? [],
@@ -73,7 +84,59 @@ export function normalizeState(raw: Partial<AppState> | undefined): AppState {
     googleCalendars: raw.googleCalendars ?? [],
     googleDeletes: raw.googleDeletes ?? [],
     notified: raw.notified ?? {},
+    listItems: raw.listItems ?? [],
+    listPending: raw.listPending ?? [],
+    foodLog: raw.foodLog ?? [],
+    customFoods: raw.customFoods ?? [],
+    nutritionTargets: raw.nutritionTargets ?? {},
+    metricTypes: raw.metricTypes?.length ? raw.metricTypes : DEFAULT_METRICS.map((m) => ({ ...m })),
+    metrics: raw.metrics ?? [],
   };
+  if ((raw.version ?? 1) < 2) migrateToV2(s);
+  return s;
+}
+
+function insertModule(mods: ModuleKey[], m: ModuleKey, after?: ModuleKey) {
+  if (mods.includes(m)) return;
+  const i = after ? mods.indexOf(after) : -1;
+  if (i === -1) mods.unshift(m);
+  else mods.splice(i + 1, 0, m);
+}
+
+/**
+ * v1 → v2: la lista de la compra (y las tareas de casa) pasan a ser listas
+ * propias que se pueden compartir; Nutrición gana «Macros» y «Peso».
+ */
+function migrateToV2(s: AppState) {
+  const now = Date.now();
+  for (const a of s.areas) {
+    const shopping = a.template === 'nutrition' && a.modules.includes('tasks') && (!a.labels?.tasks || a.labels.tasks === 'Lista de la compra');
+    const home = a.template === 'home' && a.modules.includes('tasks');
+    if (shopping || home) {
+      const list: ListKey = shopping ? 'compra' : 'casa';
+      const own = s.entries.filter((e) => e.areaId === a.id && e.kind !== 'event' && !e.date && e.repeat === 'none');
+      for (const e of own) s.listItems.push({ id: `L${e.id}`, list, text: e.title, done: !!e.done, updatedAt: now });
+      const moved = new Set(own.map((e) => e.id));
+      s.entries = s.entries.filter((e) => !moved.has(e.id));
+      const rest = s.entries.some((e) => e.areaId === a.id && e.kind !== 'event');
+      if (shopping) {
+        a.modules = a.modules.flatMap((m) => (m === 'tasks' ? (rest ? (['shopping', 'tasks'] as ModuleKey[]) : (['shopping'] as ModuleKey[])) : [m]));
+        if (a.labels) {
+          delete a.labels.tasks;
+          a.labels.shopping = 'Lista de la compra';
+        }
+      } else {
+        insertModule(a.modules, 'chores');
+        insertModule(a.modules, 'shopping');
+        if (!rest) a.modules = a.modules.filter((m) => m !== 'tasks');
+        if (a.labels?.tasks === 'Tareas de casa') delete a.labels.tasks;
+      }
+    }
+    if (a.template === 'nutrition') {
+      insertModule(a.modules, 'diary', 'menu');
+      insertModule(a.modules, 'metrics', 'diary');
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -504,5 +567,230 @@ export function markNotified(keys: string[]) {
     for (const k of keys) s.notified[k] = now;
     // Limpieza: fuera lo de hace más de 40 días
     for (const [k, t] of Object.entries(s.notified)) if (now - t > 40 * 86400000) delete s.notified[k];
+  }, { silent: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Listas del hogar (compra y tareas), compartibles                     */
+/* ------------------------------------------------------------------ */
+
+const listListeners = new Set<() => void>();
+/** Avisa de cambios hechos aquí en las listas (para enviarlos al hogar compartido). */
+export function onListChange(fn: () => void): () => void {
+  listListeners.add(fn);
+  return () => listListeners.delete(fn);
+}
+
+const me = () => state.settings.name.trim() || undefined;
+
+function markPending(s: AppState, id: ID) {
+  if (!s.listPending.includes(id)) s.listPending.push(id);
+}
+
+function listUpdate(mutator: (s: AppState) => void) {
+  update(mutator, { silent: true });
+  for (const fn of listListeners) fn();
+}
+
+const sameText = (a: string, b: string) => fold(a).trim() === fold(b).trim();
+
+/**
+ * Añade a la lista. Lo que ya estaba no se duplica: si estaba en el carro vuelve
+ * a la lista, y si trae cantidad nueva se actualiza. Devuelve lo que ya estaba.
+ */
+export function addListItems(list: ListKey, items: { text: string; qty?: string }[]): { ids: ID[]; repeated: string[] } {
+  const ids: ID[] = [];
+  const repeated: string[] = [];
+  listUpdate((s) => {
+    const t = Date.now();
+    for (const it of items) {
+      const prev = s.listItems.find((x) => x.list === list && !x.deleted && sameText(x.text, it.text));
+      if (prev) {
+        if (!prev.done) repeated.push(prev.text);
+        if (prev.done || (it.qty && it.qty !== prev.qty)) {
+          Object.assign(prev, { done: false, qty: it.qty ?? prev.qty, updatedAt: t, by: me() });
+          markPending(s, prev.id);
+        }
+        ids.push(prev.id);
+        continue;
+      }
+      const id = `L${uid()}`;
+      ids.push(id);
+      s.listItems.push({ id, list, text: it.text, qty: it.qty, done: false, updatedAt: t, by: me() });
+      markPending(s, id);
+    }
+  });
+  return { ids, repeated };
+}
+
+export function updateListItem(id: ID, patch: Partial<Pick<ListItem, 'text' | 'qty' | 'done'>>) {
+  listUpdate((s) => {
+    const it = s.listItems.find((x) => x.id === id);
+    if (!it) return;
+    Object.assign(it, patch, { updatedAt: Date.now(), by: me() });
+    markPending(s, id);
+  });
+}
+
+export function deleteListItems(ids: ID[]) {
+  const set = new Set(ids);
+  listUpdate((s) => {
+    const t = Date.now();
+    for (const it of s.listItems) {
+      if (!set.has(it.id)) continue;
+      it.deleted = true;
+      it.updatedAt = t;
+      it.by = me();
+      markPending(s, it.id);
+    }
+  });
+}
+
+export function restoreListItems(ids: ID[]) {
+  const set = new Set(ids);
+  listUpdate((s) => {
+    const t = Date.now();
+    for (const it of s.listItems) {
+      if (!set.has(it.id)) continue;
+      it.deleted = false;
+      it.updatedAt = t;
+      markPending(s, it.id);
+    }
+  });
+}
+
+export function setShare(share: ShareConfig | undefined) {
+  update((s) => {
+    s.share = share;
+    // Al empezar a compartir se envía todo lo que había en este móvil.
+    if (share) s.listPending = s.listItems.map((i) => i.id);
+  }, { silent: true });
+}
+
+export function patchShare(patch: Partial<ShareConfig>) {
+  update((s) => {
+    if (s.share) s.share = { ...s.share, ...patch };
+  }, { silent: true });
+}
+
+/** Resultado de una sincronización: nuevas listas y lo que sigue pendiente. */
+export function applySyncResult(items: ListItem[], pending: ID[], patch: Partial<ShareConfig>) {
+  update((s) => {
+    s.listItems = items;
+    s.listPending = pending;
+    if (s.share) s.share = { ...s.share, ...patch };
+  }, { silent: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Nutrición                                                            */
+/* ------------------------------------------------------------------ */
+
+export function addFoodLog(items: Omit<FoodLogItem, 'id' | 'createdAt'>[]): ID[] {
+  const ids: ID[] = [];
+  update((s) => {
+    for (const it of items) {
+      const id = uid();
+      ids.push(id);
+      s.foodLog.push({ ...it, id, createdAt: nowIso() });
+    }
+  }, { silent: true });
+  return ids;
+}
+
+export function updateFoodLog(id: ID, patch: Partial<FoodLogItem>) {
+  update((s) => {
+    const it = s.foodLog.find((x) => x.id === id);
+    if (it) Object.assign(it, patch);
+  }, { silent: true });
+}
+
+export function deleteFoodLog(ids: ID[]) {
+  const set = new Set(ids);
+  update((s) => {
+    s.foodLog = s.foodLog.filter((x) => !set.has(x.id));
+  }, { silent: true });
+}
+
+export function restoreFoodLog(items: FoodLogItem[]) {
+  update((s) => {
+    const have = new Set(s.foodLog.map((x) => x.id));
+    for (const it of items) if (!have.has(it.id)) s.foodLog.push(it);
+  }, { silent: true });
+}
+
+export function setNutritionTargets(t: NutritionTargets) {
+  update((s) => {
+    s.nutritionTargets = t;
+  }, { silent: true });
+}
+
+export function saveCustomFood(food: Omit<CustomFood, 'id'> & { id?: ID }): ID {
+  const id = food.id ?? `c${uid()}`;
+  update((s) => {
+    const i = s.customFoods.findIndex((f) => f.id === id);
+    const value = { ...food, id } as CustomFood;
+    if (i >= 0) s.customFoods[i] = value;
+    else s.customFoods.push(value);
+  }, { silent: true });
+  return id;
+}
+
+export function deleteCustomFood(id: ID) {
+  update((s) => {
+    s.customFoods = s.customFoods.filter((f) => f.id !== id);
+  }, { silent: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* Peso y medidas                                                       */
+/* ------------------------------------------------------------------ */
+
+export function saveMetricType(m: Omit<MetricType, 'id'> & { id?: ID }): ID {
+  const id = m.id ?? uid();
+  update((s) => {
+    const i = s.metricTypes.findIndex((x) => x.id === id);
+    const value = { ...m, id } as MetricType;
+    if (i >= 0) s.metricTypes[i] = value;
+    else s.metricTypes.push(value);
+  }, { silent: true });
+  return id;
+}
+
+export function deleteMetricType(id: ID) {
+  update((s) => {
+    s.metricTypes = s.metricTypes.filter((m) => m.id !== id);
+    s.metrics = s.metrics.filter((e) => e.metricId !== id);
+  }, { silent: true });
+}
+
+/** Una medida por día y tipo: si ya hay una ese día, se sustituye. */
+export function saveMetricEntry(e: Omit<MetricEntry, 'id'> & { id?: ID }): ID {
+  let id = e.id ?? uid();
+  update((s) => {
+    const same = s.metrics.find((x) => x.metricId === e.metricId && x.date === e.date && x.id !== e.id);
+    if (same) {
+      s.metrics = s.metrics.filter((x) => x.id !== e.id);
+      Object.assign(same, { value: e.value, note: e.note });
+      id = same.id;
+      return;
+    }
+    const i = s.metrics.findIndex((x) => x.id === id);
+    const value = { ...e, id } as MetricEntry;
+    if (i >= 0) s.metrics[i] = value;
+    else s.metrics.push(value);
+  }, { silent: true });
+  return id;
+}
+
+export function deleteMetricEntry(id: ID) {
+  update((s) => {
+    s.metrics = s.metrics.filter((x) => x.id !== id);
+  }, { silent: true });
+}
+
+export function restoreMetricEntry(e: MetricEntry) {
+  update((s) => {
+    if (!s.metrics.some((x) => x.id === e.id)) s.metrics.push(e);
   }, { silent: true });
 }

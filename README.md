@@ -10,7 +10,7 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 
 | Pantalla | Para qué |
 |---|---|
-| **Hoy** | Lo de hoy de un vistazo: agenda, sesiones de tus áreas (estudio, carrera, WOD), menú del día, objetivos, pendientes, cumpleaños y lo que viene. |
+| **Hoy** | **Día a vista**: hoy (o mañana) por horas, con lo que tiene hora en su sitio, lo del día aparte y una línea roja en la hora actual; toca una hora libre para apuntar algo a esa hora. Debajo: lista de la compra, menú del día, calorías de hoy, objetivos, pendientes, cumpleaños y lo que viene. |
 | **Agenda** | Tu semana día a día, la lista de lo próximo (3 meses) y los cumpleaños con cuántos años cumplen. |
 | **＋** | Añadir escribiendo como hablas (ver abajo). |
 | **Áreas** | Cada parte de tu vida con sus bloques. Se añaden y se quitan cuando quieras. |
@@ -33,9 +33,24 @@ Plantillas listas para usar (se pueden cambiar los bloques de cada área):
 - 📚 **Estudios** (p. ej. Historia del Arte): plan de estudio día a día, entregas y exámenes, documentos (PDF y artefactos de Claude), objetivos y notas.
 - 🏃 **Running**: entrenamientos sesión a sesión, con lo que has hecho («6,2 km en 37:10»).
 - 🏋️ **CrossFit**: pega el WOD del box y, con tus **RM** apuntados, la app pone los kilos al lado de cada porcentaje: `Deadlift 4x3 @80%` → **112,5 kg**. Tabla de porcentajes y discos por lado.
-- 🥗 **Nutrición**: menú semanal (lo de hoy sale en Hoy), indicaciones de la nutri y lista de la compra.
+- 🥗 **Nutrición**: menú semanal (lo de hoy sale en Hoy), **calorías y macros** de lo que comes, **peso y medidas** con su gráfica, indicaciones de la nutri y lista de la compra.
 - 💼 **Trabajo** (Academia, Ministerio…): pendientes, objetivos de la semana, notas y documentos.
-- 🏠 **Casa** u **otra área** en blanco.
+- 🏠 **Hogar**: lista de la compra (ordenada por secciones del súper) y tareas de casa, **compartidas entre los dos móviles**.
+- ⭐ **Otra área** en blanco.
+
+Los bloques nuevos («Calorías y macros», «Peso y medidas», «Lista de la compra»…) se pueden añadir a cualquier área desde su ⚙️ (p. ej. el peso en el área de CrossFit).
+
+### Calorías y macros
+
+En *Nutrición → Calorías y macros* apuntas lo que comes **escribiéndolo como lo dirías**: `150 g de pollo con 80 g de arroz y una cucharada de aceite`. La app reconoce unos 200 alimentos habituales, entiende gramos, ml, cucharadas, vasos, unidades («2 huevos», «una tostada»…) y calcula **calorías, proteína, hidratos y grasa**. Si no pones cantidad, pone una ración normal y te la marca con «¿Cuánto fue?» para que la ajustes con un toque.
+
+- **Del menú**: si el menú de la nutri tiene esa comida, se rellena sola; quitas o cambias lo que no hayas comido.
+- **Buscar**: alimentos habituales, los tuyos, los **recientes** y **productos del súper** (por nombre o código de barras, con la base abierta Open Food Facts). Lo que no exista lo creas con los datos de la etiqueta.
+- **Objetivo diario** de calorías y macros (el de la nutri, o reparto automático) y cuánto te queda; «Como ayer» repite una comida entera.
+
+### Peso y medidas
+
+Apunta tu peso (y si quieres cintura, cadera, % de grasa…) cuando te peses. Ves el valor actual, cuánto has cambiado en el periodo (1 mes, 3, 6, 1 año o todo) y a qué ritmo por semana, cuánto te falta para tu objetivo y la **gráfica de evolución** (pasa el dedo por encima para ver cada medida).
 
 **Planificaciones hechas con Claude**: en el área, «Importar de Claude» te da un mensaje para copiar y pegar en tu chat de Claude; Claude te devuelve la planificación en el formato de la app, la pegas y queda repartida por días. También acepta texto normal («26/10 | Rodaje 6 km», «Semana 1 – Lunes: …», tablas).
 
@@ -64,7 +79,19 @@ La app es una web estática: hay que publicarla en algún sitio para abrirla des
 
 La primera vez pregunta el nombre y qué áreas quieres. Cada uno tendrá su app con sus cosas.
 
-### 3. Conectar Google Calendar (opcional, recomendado)
+### 3. Hogar compartido: la misma lista de la compra en los dos móviles (opcional)
+
+La lista de la compra y las tareas de casa se pueden compartir: lo que uno apunta, al otro le aparece (y lo que se marca en el súper, también). Se guardan en una **hoja de cálculo de Google vuestra**, sin servidores de nadie más. Lo configura uno de los dos, una vez (~3 minutos, mejor desde el ordenador):
+
+1. En la app: *Ajustes → Configurar hogar compartido → Configurarlo yo*. Ahí están los pasos y el código, con vuestra clave ya puesta.
+2. Abrir [sheets.new](https://sheets.new) → *Extensiones → Apps Script* → pegar el código → Guardar.
+3. *Implementar → Nueva implementación → Aplicación web*, «Ejecutar como: **Yo**», «Quién tiene acceso: **Cualquier usuario**» → Implementar y autorizar (Google avisa de que no está verificada: *Configuración avanzada → Ir a…*).
+4. Pegar la URL que termina en `/exec` en la app → **Conectar**.
+5. *Enviar código* a la otra persona, que en su app hace *Ajustes → Configurar hogar compartido → Tengo un código* y lo pega. Si no tenía área «Hogar», se le crea sola.
+
+Cada móvil se actualiza al abrir la app, al volver a ella y cada 30 segundos mientras está abierta; sin conexión se apunta igual y se envía al volver internet. Si los dos cambiáis lo mismo a la vez, gana el último cambio.
+
+### 4. Conectar Google Calendar (opcional, recomendado)
 
 Sirve para ver vuestros eventos de Google en la agenda y, sobre todo, para que **los avisos lleguen siempre** (los recordatorios se guardan en Google Calendar con su aviso y os avisa la app de Google Calendar del móvil).
 
@@ -96,7 +123,7 @@ La app de vuestro box (por lo que parece, **Strivee**) no tiene una API pública
 
 ## Privacidad y copias
 
-- Todo se guarda en el propio móvil (IndexedDB). Nada se envía a ningún servidor salvo a Google Calendar si lo conectáis.
+- Todo se guarda en el propio móvil (IndexedDB). Nada se envía a ningún servidor salvo a Google Calendar si lo conectáis, a vuestra hoja de Google si compartís el hogar (solo las listas de casa) y, al buscar productos del súper, el texto buscado a Open Food Facts.
 - *Ajustes → Copia de seguridad* descarga un fichero con todo (incluidos los PDF). Se restaura desde Ajustes o desde la pantalla de bienvenida (útil al cambiar de móvil).
 
 ---
@@ -106,14 +133,14 @@ La app de vuestro box (por lo que parece, **Strivee**) no tiene una API pública
 ```bash
 npm install
 npm run dev        # servidor local
-npm test           # pruebas (fechas, frases, importadores, RM, Google, avisos…)
+npm test           # pruebas (fechas, frases, importadores, RM, Google, avisos, hogar compartido, alimentos, peso…)
 npm run build      # genera dist/ (incluye el service worker para usarla sin conexión)
 ```
 
 Hecho con React + TypeScript + Vite, sin servidor. Estructura:
 
 - `src/screens/` — Hoy, Agenda, Áreas, Ajustes, bienvenida.
-- `src/modules/` — bloques de las áreas (plan, pendientes, objetivos, documentos, menú, RM, notas).
+- `src/modules/` — bloques de las áreas (plan, pendientes, objetivos, documentos, menú, calorías, peso, listas, RM, notas).
 - `src/sheets/` — hojas de añadir y editar.
-- `src/lib/` — lógica: `quickParse` (frases en español), `importers` (planes y menús de Claude), `lifts` (porcentajes), `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`.
+- `src/lib/` — lógica: `quickParse` (frases en español), `importers` (planes y menús de Claude), `lifts` (porcentajes), `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`, `shareScript`/`shareSync` (hogar compartido con Apps Script), `foods`/`foodParse`/`openFoodFacts` (alimentos y macros), `metrics` (peso y gráfica).
 - `src/store/` — datos y guardado local.

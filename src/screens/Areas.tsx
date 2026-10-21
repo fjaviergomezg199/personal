@@ -2,15 +2,34 @@ import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '../components/ui';
 import { todayISO } from '../lib/dates';
+import { sumMacros } from '../lib/foods';
+import { fmt0, fmtFixed } from '../lib/num';
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { areaTasks, planForWeek, sortedAreas, todaysMenu } from '../store/selectors';
 import { addArea, useApp } from '../store/store';
 import { AREA_COLORS, EMOJI_CHOICES, TEMPLATES, type TemplateInfo } from '../store/templates';
 import type { AppState, Area, AreaColor } from '../store/types';
 
+/** «72,4 kg» (la última medida del primer tipo, normalmente el peso). */
+function latestMetric(s: AppState): string | null {
+  for (const t of s.metricTypes) {
+    const last = s.metrics.filter((m) => m.metricId === t.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (last) return `${fmtFixed(last.value, t.decimals)} ${t.unit}`;
+  }
+  return null;
+}
+
 function areaSummary(s: AppState, a: Area, today: string): string {
   const plan = s.plan.filter((p) => p.areaId === a.id && p.date === today);
   if (plan.length) return `Hoy: ${plan.map((p) => p.title).join(', ')}`;
+  if (a.modules.includes('shopping') && a.template === 'home') {
+    const n = s.listItems.filter((i) => i.list === 'compra' && !i.done && !i.deleted).length;
+    if (n) return `🛒 ${n} en la compra${s.share ? ' · compartida' : ''}`;
+  }
+  if (a.modules.includes('diary')) {
+    const kcal = sumMacros(s.foodLog.filter((l) => l.date === today)).kcal;
+    if (kcal) return `🔥 ${fmt0(kcal)}${s.nutritionTargets.kcal ? ` / ${fmt0(s.nutritionTargets.kcal)}` : ''} kcal hoy`;
+  }
   if (a.modules.includes('menu') && a.menu) {
     const meals = todaysMenu(a, today);
     if (meals.length) return `Hoy: ${meals[0].text.split('\n')[0]}`;
@@ -22,7 +41,12 @@ function areaSummary(s: AppState, a: Area, today: string): string {
     if (week.length) return `${week.filter((w) => w.done).length}/${week.length} esta semana`;
     return s.plan.some((p) => p.areaId === a.id && p.date > today) ? 'Nada hoy' : 'Sin plan todavía';
   }
+  if (a.modules.includes('metrics')) {
+    const last = latestMetric(s);
+    if (last) return `⚖️ ${last}`;
+  }
   if (a.modules.includes('menu')) return 'Sin menú todavía';
+  if (a.modules.includes('shopping')) return s.share ? 'Lista compartida' : 'Lista de la compra';
   if (a.modules.includes('tasks')) return 'Sin pendientes';
   return '';
 }

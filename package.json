@@ -1,0 +1,29 @@
+{
+  "name": "dia-a-dia",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Organizador personal de la vida: agenda, recordatorios, cumpleaños y áreas (estudios, deporte, nutrición, trabajo...).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "0.577.0",
+    "pdfjs-dist": "4.10.38",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
+  }
+}

@@ -16,6 +16,7 @@ import { AreaDetail } from './screens/AreaDetail';
 import { Areas } from './screens/Areas';
 import { Onboarding } from './screens/Onboarding';
 import { Search } from './screens/Search';
+import { ServerSetup } from './screens/ServerSetup';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
 import { Week } from './screens/Week';
@@ -37,6 +38,16 @@ export function App() {
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, [route.path]);
+
+  // Para quien mantiene la app (sin enlace): se abre también sin haberla configurado.
+  if (route.parts[0] === 'servidor') {
+    return (
+      <>
+        <ServerSetup />
+        <Toaster />
+      </>
+    );
+  }
 
   if (!state.settings.onboarded) {
     return (

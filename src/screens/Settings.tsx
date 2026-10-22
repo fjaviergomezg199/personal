@@ -13,6 +13,7 @@ import { kv, requestPersistence } from '../store/db';
 import { createInitialState, replaceState, setCloseDayReminder, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
 import { closeDayLink, turnOnCloseReminder } from '../sheets/CloseDaySheet';
 import { closeDayReminderOn } from '../lib/closeDay';
+import { HOGAR_SERVER } from '../lib/config';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
 import { AppearanceCard } from './Appearance';
 import { InstallCard } from './Install';
@@ -551,7 +552,7 @@ function AboutCard() {
 
 function HomeShareCard() {
   const state = useApp();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | 'menu' | 'join'>(false);
   const share = state.share;
   return (
     <div className="card">
@@ -561,10 +562,25 @@ function HomeShareCard() {
             `Compartís la compra, las tareas de casa, la cuenta conjunta y los planes en pareja.${share.lastSync ? ` Última sincronización: ${new Date(share.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.` : ''}`
           : 'Comparte con tu pareja la lista de la compra, las tareas de casa, la cuenta conjunta y los planes: lo que uno apunta, el otro lo ve.'}
       </p>
-      <button className="btn secondary small" onClick={() => setOpen(true)}>
-        <Users size={16} /> {share ? 'Código para tu pareja y opciones' : 'Configurar hogar compartido'}
-      </button>
-      {open && <HomeShareSheet onClose={() => setOpen(false)} />}
+      {share ? (
+        <button className="btn secondary small" onClick={() => setOpen('menu')}>
+          <Users size={16} /> Código para tu pareja y opciones
+        </button>
+      ) : HOGAR_SERVER ? (
+        <div className="btn-row">
+          <button className="btn small" onClick={() => setOpen('menu')}>
+            <Users size={16} /> Compartir con mi pareja
+          </button>
+          <button className="btn secondary small" onClick={() => setOpen('join')}>
+            Tengo un código
+          </button>
+        </div>
+      ) : (
+        <button className="btn secondary small" onClick={() => setOpen('menu')}>
+          <Users size={16} /> Configurar hogar compartido
+        </button>
+      )}
+      {open && <HomeShareSheet start={open === 'join' ? 'join' : undefined} onClose={() => setOpen(false)} />}
     </div>
   );
 }

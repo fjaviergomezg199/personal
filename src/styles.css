@@ -821,3 +821,19 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .close-option { white-space: normal; height: auto; min-height: 50px; text-align: left; justify-content: flex-start; }
 .close-lines { margin-top: 14px; display: grid; gap: 6px; font-size: calc(16px * var(--fs)); }
 .close-tomorrow { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: grid; gap: 4px; font-size: calc(15px * var(--fs)); color: var(--text-2); }
+
+/* ---------- Hogar compartido con un código ---------- */
+.share-start { padding-bottom: 4px; }
+.share-hero { font-size: calc(52px * var(--fs)); text-align: center; line-height: 1.1; margin: 4px 0 8px; }
+.share-lead { text-align: center; font-size: calc(16.5px * var(--fs)); color: var(--text-2); margin: 0 0 20px; line-height: 1.45; }
+.btn.share-main { min-height: 54px; font-size: calc(17px * var(--fs)); }
+.home-code-card { padding-top: 18px; }
+.home-code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: calc(30px * var(--fs)); font-weight: 750;
+  letter-spacing: 0.04em; margin: 6px 0 16px; color: var(--text); user-select: all; overflow-wrap: anywhere;
+}
+.input.code-input {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: calc(22px * var(--fs)); font-weight: 650;
+  letter-spacing: 0.06em; text-align: center; text-transform: uppercase; min-height: 56px;
+}
+.input.code-input::placeholder { letter-spacing: 0.06em; font-weight: 500; }

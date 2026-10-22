@@ -1,16 +1,15 @@
-/**
- * Código de Google Apps Script que convierte una hoja de cálculo de Google en
- * el «servidor» del hogar compartido. Se pega en Extensiones → Apps Script y
- * se publica como aplicación web. La clave va dentro del código.
+/*
+ * Código de Google Apps Script del hogar compartido. Dos formas, que guardan lo
+ * mismo y hablan igual con la app:
+ * - `serverScriptCode()`: el servidor de la app, uno para todos los hogares. Lo
+ *   pone una vez quien mantiene la app (ver la pantalla oculta #/servidor). Cada
+ *   hogar tiene su hoja de cálculo y se entra con su código.
+ * - `appsScriptCode(key)`: la forma avanzada, una hoja vuestra con la clave dentro
+ *   (Extensiones → Apps Script, publicada como aplicación web).
  */
-export function appsScriptCode(key: string): string {
-  return `// Día a Día · Hogar compartido (versión 4)
-// Lista de la compra, tareas de casa, cuenta conjunta y planes en pareja, compartidos entre vuestros móviles.
-// No cambies nada: pega todo esto en Extensiones → Apps Script y guarda.
 
-const CLAVE = '${key}';
-const VERSION = 4;
-const HOJA = 'Lista';
+/** Lo que hacen las dos: guardar listas y registros en el libro de `libro_()`; gana el último cambio. */
+const CORE = `const HOJA = 'Lista';
 const COLUMNAS = ['id', 'lista', 'texto', 'cantidad', 'hecho', 'actualizado', 'por', 'borrado'];
 // Lo demás va en una hoja por tipo de dato (se pueden mirar, pero mejor no tocarlas a mano).
 // Si una versión nueva de la app guarda algo más, su hoja y sus columnas se crean solas:
@@ -27,7 +26,7 @@ const MAX_HOJAS = 30;
 const MAX_COLUMNAS = 26;
 
 function hoja_() {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = libro_();
   let hoja = libro.getSheetByName(HOJA);
   if (!hoja) {
     hoja = libro.insertSheet(HOJA);
@@ -123,7 +122,7 @@ function columnasNuevas_(nombre, lista) {
 }
 
 function hojaDe_(nombre, lista) {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = libro_();
   let hoja = libro.getSheetByName(nombre);
   if (!hoja) {
     if (libro.getSheets().length >= MAX_HOJAS) return null;
@@ -205,7 +204,7 @@ function guardarRegistros_(hoja, lista, ahora) {
 function todo_(desde, bloqueados) {
   const registros = {};
   const fuera = bloqueados || [];
-  const hojas = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  const hojas = libro_().getSheets();
   for (let h = 0; h < hojas.length; h++) {
     const hoja = hojas[h];
     const nombre = hoja.getName();
@@ -226,7 +225,36 @@ function respuesta_(datos) {
   return ContentService.createTextOutput(JSON.stringify(datos)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function doGet(e) {
+// Guarda lo que manda un móvil y le devuelve lo nuevo.
+function guardarTodo_(cuerpo) {
+  const ahora = Date.now();
+  guardarLista_(cuerpo.cambios || []);
+  const registros = cuerpo.registros || {};
+  const fuera = [];
+  for (const nombre in registros) {
+    const lista = registros[nombre];
+    if (!Array.isArray(lista) || !lista.length) continue;
+    const hoja = nombre !== HOJA && NOMBRE.test(nombre) ? hojaDe_(nombre, lista) : null;
+    if (!hoja || !guardarRegistros_(hoja, lista, ahora)) fuera.push(nombre);
+  }
+  return todo_(Number(cuerpo.desde) || 0, fuera);
+}
+
+`;
+
+export function appsScriptCode(key: string): string {
+  return `// Día a Día · Hogar compartido (versión 4)
+// Lista de la compra, tareas de casa, cuenta conjunta y planes en pareja, compartidos entre vuestros móviles.
+// No cambies nada: pega todo esto en Extensiones → Apps Script y guarda.
+
+const CLAVE = '${key}';
+const VERSION = 4;
+
+function libro_() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+${CORE}function doGet(e) {
   if (!e || !e.parameter || e.parameter.clave !== CLAVE) return respuesta_({ ok: false, error: 'clave' });
   const cerrojo = LockService.getScriptLock();
   cerrojo.waitLock(20000);
@@ -248,17 +276,115 @@ function doPost(e) {
   const cerrojo = LockService.getScriptLock();
   cerrojo.waitLock(20000);
   try {
-    const ahora = Date.now();
-    guardarLista_(cuerpo.cambios || []);
-    const registros = cuerpo.registros || {};
-    const fuera = [];
-    for (const nombre in registros) {
-      const lista = registros[nombre];
-      if (!Array.isArray(lista) || !lista.length) continue;
-      const hoja = nombre !== HOJA && NOMBRE.test(nombre) ? hojaDe_(nombre, lista) : null;
-      if (!hoja || !guardarRegistros_(hoja, lista, ahora)) fuera.push(nombre);
+    return respuesta_(guardarTodo_(cuerpo));
+  } finally {
+    cerrojo.releaseLock();
+  }
+}
+`;
+}
+
+/**
+ * El servidor de la app: uno para todos los hogares, en la cuenta de Google de
+ * quien mantiene la app. Cada hogar tiene su hoja de cálculo (se crea sola) y se
+ * entra con su código; el servidor solo guarda la huella del código.
+ */
+export function serverScriptCode(): string {
+  return `// Día a Día · Servidor de hogares (versión 1)
+// Un servidor para todos los hogares de la app. Cada hogar tiene su hoja de cálculo, que se crea sola
+// en tu Google Drive («Día a Día · Hogar …»), y se entra con su código: aquí solo se guarda su huella.
+// No cambies nada: pega todo esto en un proyecto de Apps Script y publícalo como aplicación web.
+
+const VERSION = 4;
+const SERVIDOR = 1;
+const CODIGO = /^[0-9A-HJKMNP-TV-Z]{12,32}$/;
+const MAX_HOGARES = 500;
+const MAX_NUEVOS_DIA = 40;
+let LIBRO_ = null;
+
+function libro_() {
+  return LIBRO_;
+}
+
+${CORE}function huella_(codigo) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'diaadia:' + codigo, Utilities.Charset.UTF_8);
+  return bytes
+    .map(function (b) {
+      return ('0' + (b & 255).toString(16)).slice(-2);
+    })
+    .join('');
+}
+
+// El libro de un hogar, o null si ese código no existe.
+function abrir_(codigo) {
+  if (typeof codigo !== 'string' || !CODIGO.test(codigo)) return null;
+  const k = 'h:' + huella_(codigo);
+  const cache = CacheService.getScriptCache();
+  let id = cache.get(k);
+  if (!id) {
+    id = PropertiesService.getScriptProperties().getProperty(k);
+    if (!id) return null;
+    cache.put(k, id, 21600);
+  }
+  try {
+    return SpreadsheetApp.openById(id);
+  } catch (err) {
+    return null;
+  }
+}
+
+// Un hogar nuevo con el código que trae el móvil (si ya existe, se usa ese).
+function crear_(codigo, nombre) {
+  if (typeof codigo !== 'string' || !CODIGO.test(codigo)) return { ok: false, error: 'codigo' };
+  const existente = abrir_(codigo);
+  if (existente) return { ok: true, libro: existente };
+  const props = PropertiesService.getScriptProperties();
+  const total = Number(props.getProperty('total')) || 0;
+  if (total >= MAX_HOGARES) return { ok: false, error: 'lleno' };
+  const hoy = new Date().toISOString().slice(0, 10);
+  const nuevos = props.getProperty('dia') === hoy ? Number(props.getProperty('nuevos')) || 0 : 0;
+  if (nuevos >= MAX_NUEVOS_DIA) return { ok: false, error: 'espera' };
+  const quien = String(nombre || '').replace(/[\\u0000-\\u001f]/g, '').trim().slice(0, 40);
+  const libro = SpreadsheetApp.create('Día a Día · Hogar' + (quien ? ' de ' + quien : '') + ' · ' + hoy);
+  props.setProperty('h:' + huella_(codigo), libro.getId());
+  props.setProperties({ total: String(total + 1), dia: hoy, nuevos: String(nuevos + 1) });
+  return { ok: true, libro: libro };
+}
+
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  const libro = abrir_(p.clave);
+  if (!libro) return respuesta_({ ok: false, error: 'clave', servidor: SERVIDOR });
+  const cerrojo = LockService.getScriptLock();
+  cerrojo.waitLock(30000);
+  try {
+    LIBRO_ = libro;
+    return respuesta_(todo_(Number(p.desde) || 0));
+  } finally {
+    cerrojo.releaseLock();
+  }
+}
+
+function doPost(e) {
+  let cuerpo;
+  try {
+    cuerpo = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return respuesta_({ ok: false, error: 'json' });
+  }
+  if (!cuerpo) return respuesta_({ ok: false, error: 'json' });
+  const cerrojo = LockService.getScriptLock();
+  cerrojo.waitLock(30000);
+  try {
+    if (cuerpo.accion === 'crear') {
+      const r = crear_(cuerpo.clave, cuerpo.nombre);
+      if (!r.ok) return respuesta_(r);
+      LIBRO_ = r.libro;
+    } else {
+      LIBRO_ = abrir_(cuerpo.clave);
+      if (!LIBRO_) return respuesta_({ ok: false, error: 'clave', servidor: SERVIDOR });
     }
-    return respuesta_(todo_(Number(cuerpo.desde) || 0, fuera));
+    return respuesta_(guardarTodo_(cuerpo));
   } finally {
     cerrojo.releaseLock();
   }

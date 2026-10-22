@@ -193,6 +193,8 @@ export interface ShareConfig {
   url: string;
   key: string;
   name: string;
+  /** En el servidor de la app: se entra con un código corto (`key`), sin hoja propia. */
+  central?: boolean;
   lastSync?: number;
   error?: string;
   /** Hora de la hoja en la última sincronización (para pedir solo lo nuevo). */

@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Minus, Plus, Trash2 } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
 import { confirmDialog, Empty, SectionHead, Sheet, toast } from '../components/ui';
 import { addDays, capitalize, formatShort, localDay, startOfWeek, WEEKDAY_LETTERS } from '../lib/dates';
-import { bestStreak, completion, countOn, daysLabel, doneOn, scheduled, streak } from '../lib/habits';
+import { bestStreak, completion, countOn, daysLabel, doneOn, FREEZE_EVERY, scheduled, streak, streakInfo } from '../lib/habits';
 import { useToday } from '../lib/useToday';
 import { deleteHabit, moveHabit, restoreHabit, saveHabit, setHabitCount, useApp } from '../store/store';
 import { AREA_COLORS } from '../store/templates';
@@ -151,6 +151,8 @@ function HabitHistory({ h, log, today, weeks }: { h: Habit; log: Record<ISODate,
   const first = addDays(startOfWeek(today), -7 * (weeks - 1));
   const created = localDay(h.createdAt);
   const cols = Array.from({ length: weeks }, (_, w) => Array.from({ length: 7 }, (_, d) => addDays(first, w * 7 + d)));
+  // Los días sueltos que no rompieron la racha
+  const saved = new Set(streakInfo(h, log, today).freezes);
   return (
     <div className="habit-history mt12" aria-label={`Últimas ${weeks} semanas de ${h.name}`}>
       <div className="hh-days" aria-hidden>
@@ -163,8 +165,8 @@ function HabitHistory({ h, log, today, weeks }: { h: Habit; log: Record<ISODate,
           <div key={w} className="hh-col">
             {col.map((d) => {
               const n = countOn(log, d);
-              const state = d > today ? 'future' : !scheduled(h, d) || d < created ? 'off' : n >= h.target ? 'done' : n > 0 ? 'part' : 'miss';
-              const label = { future: '', off: 'no tocaba', done: 'hecho', part: `${n} de ${h.target}`, miss: 'no' }[state];
+              const state = d > today ? 'future' : !scheduled(h, d) || d < created ? 'off' : n >= h.target ? 'done' : saved.has(d) ? 'saved' : n > 0 ? 'part' : 'miss';
+              const label = { future: '', off: 'no tocaba', done: 'hecho', part: `${n} de ${h.target}`, miss: 'no', saved: 'no, pero la racha sigue' }[state];
               return <span key={d} className={`hh-cell ${state}`} title={state === 'future' ? undefined : `${capitalize(formatShort(d))}: ${label}`} />;
             })}
           </div>
@@ -182,6 +184,11 @@ function HabitHistory({ h, log, today, weeks }: { h: Habit; log: Record<ISODate,
         <span>
           <i className="hh-cell miss" /> No
         </span>
+        {saved.size > 0 && (
+          <span>
+            <i className="hh-cell saved" /> Comodín
+          </span>
+        )}
         <span>
           <i className="hh-cell off" /> No tocaba
         </span>
@@ -307,6 +314,16 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
               <div className="tiny muted">Últimos 30 días</div>
             </div>
           </div>
+          {(() => {
+            const used = streakInfo(habit, log, today).freezes[0];
+            return (
+              <p className="tiny muted center" style={{ margin: '8px 0 0' }}>
+                {used
+                  ? `🛡️ El ${formatShort(used)} no lo hiciste, pero la racha sigue: era un fallo suelto.`
+                  : `🛡️ Un día suelto sin hacer no rompe la racha (uno cada ${FREEZE_EVERY} veces que toca).`}
+              </p>
+            );
+          })()}
           <HabitHistory h={habit} log={log} today={today} weeks={16} />
         </div>
       )}

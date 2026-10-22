@@ -8,7 +8,7 @@ import { files, kv } from './db';
 import { templateInfo } from './templates';
 import type {
   AppState, Area, Birthday, Habit, CustomFood, DocMeta, Entry, FinAccount, FinanceState, FinScope, FoodLogItem, Goal, GoogleCalendarInfo,
-  GoogleEvent, GoogleLink, GoogleSettings, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
+  GoogleEvent, GoogleLink, GoogleSettings, HHMM, ID, ISODate, Lift, ListItem, ListKey, Menu, MetricEntry, MetricType, ModuleKey, Movement,
   NutritionTargets, PlanItem, Recurring, Settings, ShareConfig, TemplateKey,
 } from './types';
 
@@ -369,6 +369,46 @@ export function toggleEntryDone(id: ID, date?: ISODate) {
     e.updatedAt = nowIso();
   });
   if (shared) shareListeners();
+}
+
+/* ---------- Cerrar el día ---------- */
+
+const CLOSE_DEFAULT: NonNullable<Settings['closeDay']> = { remind: false, time: '22:00' };
+
+/**
+ * Aviso de «Cerrar el día»: un recordatorio de la propia app, cada día a esa hora
+ * (si Google Calendar está conectado, avisa también con la app cerrada). No sale
+ * en la agenda. `link` abre la app directamente en el cierre.
+ */
+export function setCloseDayReminder(remind: boolean, time: HHMM, link: string) {
+  const cur = state.settings.closeDay ?? CLOSE_DEFAULT;
+  const existing = cur.entryId ? state.entries.find((e) => e.id === cur.entryId) : undefined;
+  let entryId = existing?.id;
+  if (remind && existing) updateEntry(existing.id, { time, alert: 0, url: link });
+  else if (remind)
+    entryId = addEntry({
+      kind: 'reminder',
+      title: '🌙 Cerrar el día',
+      notes: 'Un minuto: lo que te queda de hoy, con sí o no.',
+      url: link,
+      date: todayISO(),
+      time,
+      repeat: 'daily',
+      alert: 0,
+      ritual: 'cierre',
+    });
+  else if (existing) deleteEntry(existing.id);
+  updateSettings({ closeDay: { ...cur, remind, time, entryId: remind ? entryId : undefined } });
+}
+
+/** Día cerrado: la tarjeta de Hoy se va y el aviso de esa noche ya no hace falta. */
+export function markDayClosed(day: ISODate) {
+  const cur = state.settings.closeDay ?? CLOSE_DEFAULT;
+  updateSettings({ closeDay: { ...cur, last: day } });
+  const e = cur.entryId ? state.entries.find((x) => x.id === cur.entryId) : undefined;
+  // Un aviso de madrugada (antes de las 12) es el del día siguiente en el calendario
+  const occurrence = e?.time && e.time < '12:00' ? addDays(day, 1) : day;
+  if (e && !e.doneDates?.includes(occurrence)) toggleEntryDone(e.id, occurrence);
 }
 
 /** Resultado de sincronizar los planes en pareja con la hoja. */

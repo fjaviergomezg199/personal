@@ -44,6 +44,8 @@ export interface Entry {
   dirty?: boolean;
   /** Plan en pareja: se comparte por el hogar compartido y lo ven los dos. */
   shared?: boolean;
+  /** Recordatorio de la propia app («Cerrar el día»): no sale en la agenda. */
+  ritual?: 'cierre';
   /** Quién lo cambió por última vez (en los compartidos). */
   by?: string;
   createdAt: string;
@@ -378,7 +380,7 @@ export type Accent = 'violet' | 'blue' | 'teal' | 'green' | 'amber' | 'orange' |
 export type Backdrop = 'warm' | 'neutral' | 'cool' | 'tinted';
 export type TextSize = 'normal' | 'large' | 'xlarge';
 /** Bloques de la pantalla Hoy (se pueden ordenar y ocultar). */
-export type TodaySection = 'dayview' | 'shopping' | 'overdue' | 'menu' | 'diary' | 'money' | 'habits' | 'week' | 'goals' | 'inbox' | 'upcoming';
+export type TodaySection = 'close' | 'dayview' | 'shopping' | 'overdue' | 'menu' | 'diary' | 'money' | 'habits' | 'week' | 'goals' | 'inbox' | 'upcoming';
 
 /** Copia automática en Google Drive (carpeta «Día a Día · copias»). */
 export interface DriveBackup {
@@ -412,6 +414,10 @@ export interface Settings {
   todayLayout?: { key: TodaySection; hidden?: boolean }[];
   /** «Día a vista» en lista (ahora y después) o por horas. */
   dayView?: 'list' | 'hours';
+  /** Hoy en modo sencillo: solo lo esencial. */
+  simpleToday?: boolean;
+  /** «Cerrar el día»: aviso cada noche (opcional) y último día cerrado. */
+  closeDay?: { remind: boolean; time: HHMM; entryId?: ID; last?: ISODate };
   /** Semana (su lunes) cuyo resumen ya se cerró en Hoy. */
   weekCardClosed?: ISODate;
   /** Aviso por defecto para elementos con hora (minutos). */

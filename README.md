@@ -10,11 +10,11 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 
 | Pantalla | Para qué |
 |---|---|
-| **Hoy** | **Día a vista**: hoy (o mañana) por horas, con lo que tiene hora en su sitio, lo del día aparte y una línea roja en la hora actual; toca una hora libre para apuntar algo a esa hora. Debajo: lista de la compra, hábitos, menú del día, calorías de hoy, finanzas, objetivos, pendientes, cumpleaños y lo que viene; el domingo y el lunes, **el resumen de tu semana**. Los bloques se ordenan y se ocultan a tu gusto. La 🔍 busca en todo. |
+| **Hoy** | **Tu día en una lista**: lo que ya pasó en una línea, la hora de ahora y lo que viene después (o, si lo prefieres, por horas; también mañana). Debajo: los hábitos, que se marcan con un toque; el menú con la comida que toca y **«✓ Comido»** de un toque; la compra, las calorías y lo gastado en tarjetas pequeñas; lo que se quedó de otros días en una línea («A hoy»); objetivos, pendientes y lo que viene. Por la noche, **«🌙 Cerrar el día»**; el domingo y el lunes, **el resumen de tu semana**. Los bloques se ordenan y se ocultan a tu gusto, y hay un **modo sencillo** con solo lo esencial. La 🔍 busca en todo. |
 | **Agenda** | Tu semana día a día, la lista de lo próximo (3 meses) y los cumpleaños con cuántos años cumplen. El 📊 abre el resumen de la semana. |
 | **＋** | Añadir escribiendo como hablas (ver abajo). |
 | **Áreas** | Cada parte de tu vida con sus bloques. Se añaden y se quitan cuando quieras. |
-| **Ajustes** | Avisos, Google Calendar, hogar compartido, copia de seguridad (también automática en Google Drive) y apariencia: color, fondo, tamaño de letra, tema claro/oscuro. |
+| **Ajustes** | Avisos (también el de cerrar el día), Google Calendar, hogar compartido, copia de seguridad (también automática en Google Drive) y apariencia: color, fondo, tamaño de letra, tema claro/oscuro y *Hoy* completo o sencillo. |
 
 ### Añadir en una frase
 
@@ -33,7 +33,11 @@ Cualquier plan, recordatorio o tarea se puede compartir con un interruptor: **«
 
 ### Hábitos
 
-Beber agua, leer, estirar… cada uno con los días en que toca y cuántas veces al día (8 vasos de agua). En *Hoy* se marcan con un toque, con la **racha** 🔥 de días seguidos; en el hábito ves las últimas semanas en cuadritos y tu mejor racha.
+Beber agua, leer, estirar… cada uno con los días en que toca y cuántas veces al día (8 vasos de agua). En *Hoy* se marcan con un toque, con la **racha** 🔥 de días seguidos; en el hábito ves las últimas semanas en cuadritos y tu mejor racha. **Un día suelto sin hacer no rompe la racha** (un comodín 🛡️ cada 7 veces que toca); en los cuadritos sale como «Comodín».
+
+### Cerrar el día
+
+Por la noche (desde las 20:00) sale en *Hoy* **«🌙 Cerrar el día»**: un minuto, todo con **sí o no**, sin escribir nada. Solo pregunta lo que falta: los hábitos sin marcar, las comidas del menú sin apuntar (si el menú tiene opciones, se elige con un botón; al decir que sí se apuntan sus calorías) y lo de hoy sin hacer (si no se hizo, pasa a mañana). Como mucho 10 preguntas; «Atrás» deshace la última y «Terminar ya» lo deja ahí. Al final, un resumen (hábitos, calorías, lo hecho y tu mejor racha) y lo que hay mañana. Hasta las 4 de la madrugada todavía cierra el día anterior. Si quieres, te avisa cada noche a la hora que elijas (*Ajustes → Avisos*; con Google Calendar conectado, avisa también con la app cerrada).
 
 ### Resumen de la semana
 

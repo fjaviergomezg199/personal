@@ -98,7 +98,24 @@ export function AppearanceCard() {
         ))}
       </div>
 
-      <button className="btn secondary block mt16" onClick={() => setLayoutOpen(true)}>
+      <div className="label mt16">Pantalla Hoy</div>
+      <div className="mt8">
+        <Segmented<'full' | 'simple'>
+          value={s.simpleToday ? 'simple' : 'full'}
+          onChange={(v) => updateSettings({ simpleToday: v === 'simple' })}
+          options={[
+            { value: 'full', label: 'Completa' },
+            { value: 'simple', label: 'Sencilla' },
+          ]}
+        />
+      </div>
+      <p className="hint">
+        {s.simpleToday
+          ? 'Solo lo esencial: cerrar el día, tu día, los hábitos y la compra. Lo demás sigue en Áreas.'
+          : '«Sencilla» deja en Hoy solo lo esencial; lo demás sigue en Áreas.'}
+      </p>
+
+      <button className="btn secondary block mt8" onClick={() => setLayoutOpen(true)}>
         <LayoutList size={18} /> Qué sale en Hoy y en qué orden
       </button>
       {layoutOpen && <TodayLayoutSheet onClose={() => setLayoutOpen(false)} />}

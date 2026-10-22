@@ -12,12 +12,14 @@ import { mealForNow, mealsForDay, menuMealItems } from '../lib/diary';
 import { macrosFor, sumMacros } from '../lib/foods';
 import { HabitsToday } from '../modules/HabitsModule';
 import { AddFoodSheet } from '../sheets/AddFoodSheet';
+import { CloseDaySheet } from '../sheets/CloseDaySheet';
+import { closeDayCardDay, closeDayLinkDay } from '../lib/closeDay';
 import { MovementSheet } from '../sheets/MovementSheet';
 import type { Area, ModuleKey, TodaySection } from '../store/types';
-import { resolveLayout } from '../lib/todayLayout';
-import { useToday } from '../lib/useToday';
+import { resolveLayout, SIMPLE_SECTIONS } from '../lib/todayLayout';
+import { useTick, useToday } from '../lib/useToday';
 import { agendaForDate, areaMap, inboxTasks, overdueEntries, sortedAreas, todaysMenu, upcomingAgenda } from '../store/selectors';
-import { addFoodLog, deleteFoodLog, getState, updateEntry, useApp } from '../store/store';
+import { addFoodLog, deleteFoodLog, getState, updateEntry, updateSettings, useApp } from '../store/store';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
 import { WeekCard } from './Week';
 
@@ -35,10 +37,18 @@ export function Today() {
   const ver = route.query.get('ver');
   const nuevo = route.query.get('nuevo');
   const accion = route.query.get('accion');
+  const cerrar = route.query.get('cerrar');
+  /** El día que se está cerrando (con la hoja abierta). */
+  const [closing, setClosing] = useState<string | null>(null);
   useEffect(() => {
     if (ver) {
       clearQuery('ver');
-      openSheet({ type: 'entry', id: ver });
+      // El aviso de «Cerrar el día» abre el cierre, no el recordatorio
+      if (getState().entries.find((e) => e.id === ver)?.ritual) setClosing(closeDayLinkDay(new Date()));
+      else openSheet({ type: 'entry', id: ver });
+    } else if (cerrar) {
+      clearQuery('cerrar');
+      setClosing(closeDayLinkDay(new Date()));
     } else if (nuevo) {
       clearQuery('nuevo');
       openSheet({ type: 'quick' });
@@ -56,7 +66,7 @@ export function Today() {
         navigate(a ? `/areas/${a.id}?bloque=diary&nuevo=1` : '/areas');
       } else if (accion === 'buscar') navigate('/buscar');
     }
-  }, [ver, nuevo, accion]);
+  }, [ver, nuevo, accion, cerrar]);
 
   const areas = useMemo(() => areaMap(state), [state]);
   const items = useMemo(() => agendaForDate(state, today, areas), [state, today, areas]);
@@ -84,6 +94,7 @@ export function Today() {
   const name = state.settings.name;
 
   const blocks: Record<TodaySection, ReactNode> = {
+    close: <CloseDayCard onStart={setClosing} />,
     dayview: (
       <div className="section">
         <SectionHead
@@ -213,7 +224,8 @@ export function Today() {
       </div>
     ),
   };
-  const layout = resolveLayout(state.settings.todayLayout);
+  const simple = !!state.settings.simpleToday;
+  const layout = resolveLayout(state.settings.todayLayout).filter((l) => !simple || SIMPLE_SECTIONS.includes(l.key));
 
   return (
     <div className="screen">
@@ -280,7 +292,33 @@ export function Today() {
           </div>
         </div>
       )}
+      <p className="hint center mt24">
+        <button className="link-btn" style={{ padding: 0 }} onClick={() => updateSettings({ simpleToday: !simple })}>
+          {simple ? 'Ver Hoy completo' : '¿Mucho? Ver Hoy en modo sencillo'}
+        </button>
+      </p>
       <RefreshHint />
+      {closing && <CloseDaySheet day={closing} onClose={() => setClosing(null)} />}
+    </div>
+  );
+}
+
+/** Por la noche (hasta que se cierre el día): un minuto, todo con sí o no. */
+function CloseDayCard({ onStart }: { onStart: (day: string) => void }) {
+  const state = useApp();
+  useTick(60000); // para que salga a su hora con la app abierta
+  const day = closeDayCardDay(state, new Date());
+  if (!day) return null;
+  return (
+    <div className="banner tone-violet mt12 close-card" role="button" tabIndex={0} onClick={() => onStart(day)} onKeyDown={(e) => e.key === 'Enter' && onStart(day)}>
+      <div className="big" aria-hidden>
+        🌙
+      </div>
+      <div className="grow">
+        <div className="t">Cerrar el día</div>
+        <div className="d">Un minuto, todo con sí o no.</div>
+      </div>
+      <span className="btn small tone">Empezar</span>
     </div>
   );
 }

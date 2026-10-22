@@ -63,7 +63,7 @@ export function searchAll(s: AppState, query: string, today: ISODate): HitGroup[
     'Agenda y pendientes',
     [
       ...s.entries
-        .filter((e) => has(e.title, e.notes, e.location))
+        .filter((e) => !e.ritual && has(e.title, e.notes, e.location))
         .map<Hit>((e) => ({
           key: `e${e.id}`,
           emoji: e.kind === 'task' ? '✅' : e.kind === 'event' ? '📅' : '⏰',

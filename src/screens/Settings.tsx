@@ -10,7 +10,9 @@ import { notificationPermission, requestNotificationPermission, showSystemNotifi
 import { pendingGoogleChanges } from '../lib/sync';
 import { connectGoogle, runDriveBackup, runSync, startDriveRestore, useSyncStatus } from '../lib/syncRunner';
 import { kv, requestPersistence } from '../store/db';
-import { createInitialState, replaceState, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
+import { createInitialState, replaceState, setCloseDayReminder, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
+import { closeDayLink, turnOnCloseReminder } from '../sheets/CloseDaySheet';
+import { closeDayReminderOn } from '../lib/closeDay';
 import { HomeShareSheet } from '../sheets/HomeShareSheet';
 import { AppearanceCard } from './Appearance';
 import { InstallCard } from './Install';
@@ -75,6 +77,7 @@ export function Settings() {
 function NotificationsCard() {
   const state = useApp();
   const s = state.settings;
+  const closeOn = closeDayReminderOn(state);
   const [perm, setPerm] = useState(notificationPermission());
   const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -142,6 +145,29 @@ function NotificationsCard() {
           </select>
         </div>
       </div>
+      <div className="divider" />
+      <Switch
+        checked={closeOn}
+        label="🌙 Cerrar el día"
+        description={
+          closeOn && s.closeDay
+            ? `Aviso cada noche a las ${s.closeDay.time}: un minuto para lo que te queda de hoy, con sí o no.`
+            : 'Un aviso cada noche para dejar el día cerrado en un minuto (la tarjeta sale en Hoy igualmente).'
+        }
+        onChange={(on) => (on ? void turnOnCloseReminder(s.closeDay?.time ?? '22:00') : setCloseDayReminder(false, s.closeDay?.time ?? '22:00', ''))}
+      />
+      {closeOn && s.closeDay && (
+        <div className="field">
+          <label htmlFor="st-close">Hora del aviso</label>
+          <input
+            id="st-close"
+            className="input"
+            type="time"
+            value={s.closeDay.time}
+            onChange={(e) => e.target.value && setCloseDayReminder(true, e.target.value, closeDayLink())}
+          />
+        </div>
+      )}
       <div className="callout mt16">
         <b>Para que te avise siempre</b>, aunque no abras la app: conecta Google Calendar aquí abajo. Tus recordatorios, planes y cumpleaños se guardan allí con su aviso y te
         avisa la app de Google Calendar del móvil. Sin Google, los avisos de esta app saltan cuando la tienes abierta o la abres.

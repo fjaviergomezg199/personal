@@ -2,6 +2,7 @@ import type { TodaySection } from '../store/types';
 
 /** Bloques de la pantalla Hoy, en su orden de siempre. */
 export const TODAY_SECTIONS: { key: TodaySection; label: string; emoji: string; hint?: string }[] = [
+  { key: 'close', label: 'Cerrar el día', emoji: '🌙', hint: 'por la noche' },
   { key: 'dayview', label: 'Día a vista', emoji: '🗓️' },
   { key: 'week', label: 'Resumen de la semana', emoji: '📊', hint: 'domingo y lunes' },
   { key: 'overdue', label: 'De otros días', emoji: '⏰' },
@@ -15,6 +16,9 @@ export const TODAY_SECTIONS: { key: TodaySection; label: string; emoji: string; 
   { key: 'inbox', label: 'Pendientes', emoji: '📥' },
   { key: 'upcoming', label: 'Próximamente', emoji: '🔜' },
 ];
+
+/** Lo que se ve en Hoy en modo sencillo. */
+export const SIMPLE_SECTIONS: TodaySection[] = ['close', 'dayview', 'week', 'habits', 'shopping'];
 
 /**
  * El orden guardado por la persona, con los bloques nuevos (de versiones

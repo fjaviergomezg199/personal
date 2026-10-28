@@ -201,6 +201,8 @@ export interface GCalEvent {
   end: GCalDate;
   recurrence?: string[];
   reminders?: { useDefault: boolean; overrides?: { method: 'popup' | 'email'; minutes: number }[] };
+  /** Color del evento en Google Calendar ('1'…'11'). */
+  colorId?: string;
   extendedProperties?: { private?: Record<string, string> };
 }
 export interface GCalCalendar {

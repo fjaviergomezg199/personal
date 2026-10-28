@@ -9,19 +9,15 @@ import { hasValidToken } from './lib/google';
 import { dueAlerts, showSystemNotification } from './lib/notify';
 import { nextOccurrence } from './lib/recurrence';
 import { navigate, useRoute } from './lib/router';
-import { syncShare } from './lib/shareSync';
 import { maybeAutoReconnect, runDriveBackup, runSync } from './lib/syncRunner';
-import { Agenda } from './screens/Agenda';
-import { AreaDetail } from './screens/AreaDetail';
-import { Areas } from './screens/Areas';
+import { Calendar } from './screens/Calendar';
+import { HabitsScreen } from './screens/Habits';
 import { Onboarding } from './screens/Onboarding';
 import { Search } from './screens/Search';
-import { ServerSetup } from './screens/ServerSetup';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
-import { Week } from './screens/Week';
 import { DriveRestoreHost } from './sheets/DriveRestoreSheet';
-import { getState, markNotified, onDataChange, onListChange, useApp } from './store/store';
+import { getState, markNotified, onDataChange, useApp } from './store/store';
 import type { Settings as SettingsT } from './store/types';
 
 export function App() {
@@ -30,7 +26,6 @@ export function App() {
   useAppearance(state.settings);
   useAlerts();
   useGoogleSync();
-  useHomeShare();
   useDriveBackup();
   useServiceWorker();
   const shared = useSharedText();
@@ -38,16 +33,6 @@ export function App() {
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, [route.path]);
-
-  // Para quien mantiene la app (sin enlace): se abre también sin haberla configurado.
-  if (route.parts[0] === 'servidor') {
-    return (
-      <>
-        <ServerSetup />
-        <Toaster />
-      </>
-    );
-  }
 
   if (!state.settings.onboarded) {
     return (
@@ -60,14 +45,12 @@ export function App() {
     );
   }
 
-  const [section, sub] = route.parts;
+  const [section] = route.parts;
   let screen;
-  if (section === 'agenda') screen = <Agenda />;
-  else if (section === 'areas' && sub) screen = <AreaDetail key={sub} id={sub} />;
-  else if (section === 'areas') screen = <Areas />;
+  if (section === 'calendario' || section === 'agenda') screen = <Calendar />;
+  else if (section === 'habitos') screen = <HabitsScreen />;
   else if (section === 'ajustes') screen = <Settings />;
   else if (section === 'buscar') screen = <Search />;
-  else if (section === 'semana') screen = <Week />;
   else screen = <Today />;
 
   return (
@@ -126,7 +109,7 @@ function useAlerts() {
             const route = a.route;
             toast(`${a.title}${a.body ? ` · ${a.body}` : ''}`, {
               duration: 9000,
-              action: route.includes('cerrar=') ? 'Empezar' : 'Ver',
+              action: 'Ver',
               onAction: () => void (location.hash = route),
             });
             shown = true;
@@ -207,32 +190,6 @@ function useGoogleSync() {
     }, 2500);
     return () => clearTimeout(t);
   }, [current]);
-}
-
-/** Hogar compartido: envía los cambios de las listas y recoge los de la otra persona. */
-function useHomeShare() {
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const kick = (delay: number) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (getState().share) void syncShare();
-      }, delay);
-    };
-    const off = onListChange(() => kick(700));
-    kick(400);
-    const poll = setInterval(() => document.visibilityState === 'visible' && kick(0), 30000);
-    const onVisible = () => document.visibilityState === 'visible' && kick(0);
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', onVisible);
-    return () => {
-      off();
-      clearTimeout(timer);
-      clearInterval(poll);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('online', onVisible);
-    };
-  }, []);
 }
 
 /** Copia en Google Drive: una al día si hay cambios (cuando hay permiso de Google; no hace falta tocar nada). */

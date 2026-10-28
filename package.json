@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Organizador personal de la vida: agenda, recordatorios, cumpleaños y áreas (estudios, deporte, nutrición, trabajo...).",
+  "description": "Agenda personal: día, semana y mes con categorías de colores, hábitos e importación de planes en JSON.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "lucide-react": "0.577.0",
-    "pdfjs-dist": "4.10.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

@@ -1,7 +1,5 @@
-import { ArrowDown, ArrowUp, Check, LayoutList } from 'lucide-react';
-import { useState } from 'react';
-import { Segmented, Sheet } from '../components/ui';
-import { resolveLayout, TODAY_SECTIONS } from '../lib/todayLayout';
+import { Check } from 'lucide-react';
+import { Segmented } from '../components/ui';
 import { updateSettings, useApp } from '../store/store';
 import type { Accent, Backdrop, Settings, TextSize } from '../store/types';
 
@@ -31,7 +29,6 @@ const EMOJIS = ['👋', '🌞', '✨', '💪', '🌸', '🦋', '🌿', '☕', '�
 export function AppearanceCard() {
   const state = useApp();
   const s = state.settings;
-  const [layoutOpen, setLayoutOpen] = useState(false);
   const accent = s.accent ?? 'violet';
   const backdrop = s.backdrop ?? 'warm';
 
@@ -97,79 +94,6 @@ export function AppearanceCard() {
           </button>
         ))}
       </div>
-
-      <div className="label mt16">Pantalla Hoy</div>
-      <div className="mt8">
-        <Segmented<'full' | 'simple'>
-          value={s.simpleToday ? 'simple' : 'full'}
-          onChange={(v) => updateSettings({ simpleToday: v === 'simple' })}
-          options={[
-            { value: 'full', label: 'Completa' },
-            { value: 'simple', label: 'Sencilla' },
-          ]}
-        />
-      </div>
-      <p className="hint">
-        {s.simpleToday
-          ? 'Solo lo esencial: cerrar el día, tu día, los hábitos y la compra. Lo demás sigue en Áreas.'
-          : '«Sencilla» deja en Hoy solo lo esencial; lo demás sigue en Áreas.'}
-      </p>
-
-      <button className="btn secondary block mt8" onClick={() => setLayoutOpen(true)}>
-        <LayoutList size={18} /> Qué sale en Hoy y en qué orden
-      </button>
-      {layoutOpen && <TodayLayoutSheet onClose={() => setLayoutOpen(false)} />}
     </div>
-  );
-}
-
-function TodayLayoutSheet({ onClose }: { onClose: () => void }) {
-  const state = useApp();
-  const layout = resolveLayout(state.settings.todayLayout);
-  const save = (next: typeof layout) => updateSettings({ todayLayout: next });
-  const move = (i: number, d: number) => {
-    const next = [...layout];
-    const [x] = next.splice(i, 1);
-    next.splice(i + d, 0, x);
-    save(next);
-  };
-  return (
-    <Sheet open onClose={onClose} title="Pantalla Hoy">
-      <p className="small muted" style={{ marginTop: 0 }}>
-        Ordena los bloques con las flechas y apaga los que no quieras ver. Lo que no tenga nada ese día no sale igualmente.
-      </p>
-      <div className="card" style={{ padding: '4px 12px' }}>
-        {layout.map((l, i) => {
-          const meta = TODAY_SECTIONS.find((t) => t.key === l.key)!;
-          return (
-            <div key={l.key} className={`layout-row ${l.hidden ? 'off' : ''}`}>
-              <span aria-hidden>{meta.emoji}</span>
-              <span className="grow">
-                {meta.label}
-                {meta.hint && <span className="tiny muted"> · {meta.hint}</span>}
-              </span>
-              <button className="icon-btn small plain" aria-label={`Subir ${meta.label}`} disabled={i === 0} onClick={() => move(i, -1)}>
-                <ArrowUp size={16} />
-              </button>
-              <button className="icon-btn small plain" aria-label={`Bajar ${meta.label}`} disabled={i === layout.length - 1} onClick={() => move(i, 1)}>
-                <ArrowDown size={16} />
-              </button>
-              <span className="switch">
-                <input
-                  type="checkbox"
-                  checked={!l.hidden}
-                  aria-label={`Mostrar ${meta.label}`}
-                  onChange={(e) => save(layout.map((x) => (x.key === l.key ? { ...x, hidden: !e.target.checked } : x)))}
-                />
-                <span />
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <button className="btn ghost block mt12" onClick={() => updateSettings({ todayLayout: undefined })}>
-        Volver al orden de siempre
-      </button>
-    </Sheet>
   );
 }

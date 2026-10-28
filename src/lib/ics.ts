@@ -1,7 +1,6 @@
 import { addDays, addMinutesToTime } from './dates';
-import { birthdayInYear } from './recurrence';
 import { rrule } from './sync';
-import type { Birthday, Entry } from '../store/types';
+import type { Entry } from '../store/types';
 
 const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 
@@ -45,20 +44,6 @@ export function entryToIcs(e: Entry): string {
   const rule = rrule(e.repeat, e.repeatUntil, !e.time);
   if (rule) lines.push(rule[0]);
   lines.push(...alarm(e.alert));
-  return wrap([vevent(lines)]);
-}
-
-export function birthdayToIcs(b: Birthday, alert: number | null): string {
-  const date = birthdayInYear(b, new Date().getFullYear());
-  const lines = [
-    `UID:b-${b.id}@diaadia`,
-    `DTSTAMP:${stamp()}`,
-    `SUMMARY:${esc(`🎂 Cumpleaños de ${b.name}`)}`,
-    `DTSTART;VALUE=DATE:${compact(date)}`,
-    `DTEND;VALUE=DATE:${compact(addDays(date, 1))}`,
-    'RRULE:FREQ=YEARLY',
-    ...alarm(alert),
-  ];
   return wrap([vevent(lines)]);
 }
 

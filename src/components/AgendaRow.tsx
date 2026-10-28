@@ -1,55 +1,39 @@
 import { Bell, MapPin, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { categoryInfo } from '../lib/categories';
 import { formatRelative, todayISO } from '../lib/dates';
-import { partnerName } from '../store/selectors';
-import { getState, toggleEntryDone, updatePlanItem } from '../store/store';
+import { toggleEntryDone } from '../store/store';
 import type { AgendaItem } from '../store/selectors';
-import type { Area, Entry } from '../store/types';
+import type { Category, Entry } from '../store/types';
 import { openSheet } from './sheets';
 import { Check } from './ui';
 
-export function entryEmoji(e: Entry): string {
-  const cat = categoryInfo(e.category);
-  if (cat) return cat.emoji;
-  if (e.kind === 'event') return '📅';
-  if (e.kind === 'task') return '✅';
-  return '⏰';
-}
-
-export function AreaBadge({ area }: { area?: Area }) {
-  if (!area) return null;
+/** «● 2Sigma», del color de la categoría. */
+export function CategoryBadge({ category }: { category?: Category }) {
+  if (!category) return null;
   return (
-    <span className={`badge tone-${area.color}`}>
-      {area.emoji} {area.name}
+    <span className={`cat-badge tone-${category.color}`}>
+      <i aria-hidden />
+      {category.emoji ? `${category.emoji} ` : ''}
+      {category.name}
     </span>
   );
 }
 
-/** «👥 Con Leyre» en los planes en pareja. */
-export function SharedBadge() {
-  const s = getState();
-  if (!s.share) return null;
-  const partner = partnerName(s);
-  return <span className="badge tone-primary">👥 {partner ? `Con ${partner}` : 'En pareja'}</span>;
-}
-
-export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; area?: Area; showDate?: boolean; overdue?: boolean; trail?: ReactNode }) {
-  const { entry: e, area } = props;
+export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; category?: Category; showDate?: boolean; overdue?: boolean; trail?: ReactNode }) {
+  const { entry: e, category } = props;
   const date = props.date ?? e.date;
   const done = props.done ?? !!e.done;
   const completable = e.kind !== 'event';
-  const cat = categoryInfo(e.category);
   return (
     <div
-      className={`row tappable ${done ? 'done' : ''} ${area ? `tone-${area.color}` : ''}`}
+      className={`row tappable ${done ? 'done' : ''} ${category ? `has-cat tone-${category.color}` : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => openSheet({ type: 'entry', id: e.id, date })}
       onKeyDown={(ev) => ev.key === 'Enter' && openSheet({ type: 'entry', id: e.id, date })}
     >
       <div className="lead">
-        {completable ? <Check on={done} onChange={() => toggleEntryDone(e.id, date)} /> : <span aria-hidden>{entryEmoji(e)}</span>}
+        {completable ? <Check on={done} onChange={() => toggleEntryDone(e.id, date)} /> : <span className="ev-dot" aria-hidden />}
       </div>
       <div className="body">
         <div className="title">
@@ -68,9 +52,7 @@ export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; a
               {e.endTime ? `–${e.endTime}` : ''}
             </span>
           )}
-          {completable && cat && <span>{cat.emoji} {cat.label}</span>}
-          {e.shared && <SharedBadge />}
-          {area && <AreaBadge area={area} />}
+          <CategoryBadge category={category} />
           {e.repeat !== 'none' && (
             <span aria-label="Se repite">
               <Repeat size={13} />
@@ -93,37 +75,11 @@ export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; a
   );
 }
 
-export function AgendaRow({ item, showArea = true, trail }: { item: AgendaItem; showArea?: boolean; trail?: ReactNode }) {
+export function AgendaRow({ item, trail }: { item: AgendaItem; trail?: ReactNode }) {
   const trailEl = trail ? <div className="trail tiny">{trail}</div> : null;
   switch (item.kind) {
     case 'entry':
-      return <EntryRow entry={item.entry} date={item.date} done={item.done} area={showArea ? item.area : undefined} trail={trail} />;
-    case 'plan': {
-      const p = item.item;
-      return (
-        <div
-          className={`row tappable ${item.done ? 'done' : ''} tone-${item.area.color}`}
-          role="button"
-          tabIndex={0}
-          onClick={() => openSheet({ type: 'plan', id: p.id })}
-          onKeyDown={(ev) => ev.key === 'Enter' && openSheet({ type: 'plan', id: p.id })}
-        >
-          <div className="lead">
-            <Check on={item.done} onChange={() => updatePlanItem(p.id, { done: !p.done })} />
-          </div>
-          <div className="body">
-            <div className="title">{p.title}</div>
-            <div className="meta">
-              {p.time && <span style={{ fontWeight: 650, color: 'var(--text)' }}>{p.time}</span>}
-              {showArea && <AreaBadge area={item.area} />}
-              {p.result && <span>✍️ {p.result}</span>}
-              {!p.result && p.details && <span className="ellipsis" style={{ maxWidth: '100%' }}>{p.details.split('\n')[0]}</span>}
-            </div>
-          </div>
-          {trailEl}
-        </div>
-      );
-    }
+      return <EntryRow entry={item.entry} date={item.date} done={item.done} category={item.category} trail={trail} />;
     case 'birthday': {
       const b = item.birthday;
       return (

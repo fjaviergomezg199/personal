@@ -220,15 +220,6 @@ export function Empty(props: { emoji: string; title: string; text?: ReactNode; a
   );
 }
 
-export function Progress({ value, max }: { value: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div className="progress" role="progressbar" aria-valuenow={value} aria-valuemax={max}>
-      <div style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
-
 export function SectionHead(props: { title: ReactNode; count?: number; action?: ReactNode }) {
   return (
     <div className="section-head">

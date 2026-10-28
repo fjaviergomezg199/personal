@@ -5,14 +5,8 @@ import { backupToDrive, driveBackupDue, KEEP_COPIES, listDriveCopies, restoreFro
 import { DRIVE_SCOPE, GOOGLE_SCOPES } from './google';
 import { fakeDrive } from './testing/fakeDrive';
 
-// Los archivos de las áreas, en memoria (en el móvil van en IndexedDB).
-const mem = vi.hoisted(() => new Map<string, Blob>());
 vi.mock('../store/db', () => ({
-  files: {
-    get: async (id: string) => mem.get(id),
-    put: async (id: string, b: Blob) => void mem.set(id, b),
-    del: async (id: string) => void mem.delete(id),
-  },
+  files: { get: async () => undefined, put: async () => undefined, del: async () => undefined },
   kv: { get: async () => undefined, set: async () => undefined },
 }));
 
@@ -29,10 +23,7 @@ function start(extra: Partial<AppState> = {}) {
   replaceState(
     normalizeState({
       settings: { name: 'Leyre', onboarded: true, drive: { on: true }, google: { clientId: 'cid' } },
-      docs: [
-        { id: 'D1', areaId: 'est', title: 'Plan de estudio', type: 'pdf', fileName: 'plan.pdf', mime: 'application/pdf', createdAt: now },
-        { id: 'D2', areaId: 'est', title: 'Web de la academia', type: 'link', url: 'https://academia.example', createdAt: now },
-      ],
+      categories: [{ id: 'c1', name: '2Sigma', color: 'blue', order: 0, createdAt: now }],
       ...extra,
     } as unknown as Partial<AppState>),
   );
@@ -42,8 +33,6 @@ const cita = (title: string) => addEntry({ kind: 'event', title, date: '2026-10-
 let drive: ReturnType<typeof fakeDrive>;
 beforeEach(() => {
   storage.clear();
-  mem.clear();
-  mem.set('D1', new Blob(['%PDF plan'], { type: 'application/pdf' }));
   vi.stubGlobal('localStorage', fakeStorage);
   drive = fakeDrive();
   vi.stubGlobal('fetch', drive.fetchImpl);
@@ -59,13 +48,9 @@ describe('copia en Google Drive', () => {
   it('la primera crea la carpeta, sube los archivos y la copia del día', async () => {
     cita('Cena en el Txoko');
     const r = await backupToDrive();
-    expect(r).toEqual({ status: 'ok', copies: 1, uploaded: 1 });
+    expect(r).toEqual({ status: 'ok', copies: 1 });
     const [folder] = drive.live('carpeta');
     expect(folder.name).toBe('Día a Día · copias');
-    const [sub] = drive.live('archivos');
-    expect(sub.parents).toEqual([folder.id]);
-    const [file] = drive.live('archivo');
-    expect([file.name, file.parents, file.appProperties.doc, await file.content.text()]).toEqual(['plan.pdf', [sub.id], 'D1', '%PDF plan']);
     const [copy] = drive.live('copia');
     expect(copy.parents).toEqual([folder.id]);
     expect(copy.name).toMatch(/^dia-a-dia-\d{4}-\d{2}-\d{2}\.json$/);
@@ -81,11 +66,10 @@ describe('copia en Google Drive', () => {
     expect(await backupToDrive()).toEqual({ status: 'unchanged' });
     expect(driveBackupDue()).toBe(false);
     cita('Cine');
-    expect(await backupToDrive()).toEqual({ status: 'ok', copies: 1, uploaded: 0 });
+    expect(await backupToDrive()).toEqual({ status: 'ok', copies: 1 });
     const copies = drive.live('copia');
     expect(copies).toHaveLength(1);
     expect(JSON.parse(await copies[0].content.text()).state.entries).toHaveLength(1);
-    expect(drive.live('archivo')).toHaveLength(1);
   });
 
   it(`guarda las ${KEEP_COPIES} últimas (las viejas van a la papelera)`, async () => {
@@ -102,33 +86,23 @@ describe('copia en Google Drive', () => {
     expect(getState().settings.drive?.copies).toBe(KEEP_COPIES);
   });
 
-  it('en un móvil nuevo recupera la copia y sus archivos', async () => {
+  it('en un móvil nuevo recupera la copia', async () => {
     cita('Cena en el Txoko');
     await backupToDrive();
-    const areas = getState().areas.map((a) => a.name);
-    // Móvil nuevo: sin datos ni archivos
-    mem.clear();
+    // Móvil nuevo: sin datos
     replaceState(normalizeState({ settings: { name: '', onboarded: false, google: { clientId: 'cid' } } } as unknown as Partial<AppState>));
     const copies = await listDriveCopies();
     expect(copies).toHaveLength(1);
     const r = await restoreFromDrive(copies[0]);
-    expect(r).toMatchObject({ areas: areas.length, entries: 1, docs: 1, missing: 0 });
-    expect(await mem.get('D1')?.text()).toBe('%PDF plan');
+    expect(r).toEqual({ categories: 1, entries: 1 });
     const s = getState();
     expect(s.settings).toMatchObject({ name: 'Leyre', onboarded: true, drive: { on: true } });
     expect(s.entries.map((e) => e.title)).toEqual(['Cena en el Txoko']);
-    expect(s.areas.map((a) => a.name)).toEqual(areas);
+    expect(s.categories.map((c) => c.name)).toEqual(['2Sigma']);
     // Ese día no se sube copia automática (recuperando una copia vieja se perdería la de hoy)
     cita('Algo nuevo');
     expect(driveBackupDue()).toBe(false);
     expect(driveBackupDue(getState(), new Date(Date.now() + 86400000))).toBe(true);
-  });
-
-  it('un archivo grande se sube por partes', async () => {
-    mem.set('D1', new Blob([new Uint8Array(5 * 1024 * 1024)], { type: 'application/pdf' }));
-    await backupToDrive();
-    expect(drive.calls.filter((c) => c.includes('resumable'))).toEqual(['POST /upload/drive/v3/files?resumable', 'PUT /upload/drive/v3/files?resumable']);
-    expect(drive.live('archivo')[0].content.size).toBe(5 * 1024 * 1024);
   });
 
   it('si falta activar la API de Drive, lo explica con el enlace (y no insiste cada momento)', async () => {

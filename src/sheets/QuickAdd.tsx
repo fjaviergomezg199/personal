@@ -1,44 +1,41 @@
-import { useMemo, useRef, useState } from 'react';
-import { formatRelative, todayISO } from '../lib/dates';
-import { mentionsPartner, parseQuick } from '../lib/quickParse';
-import { partnerName } from '../store/selectors';
-import { addBirthday, addEntry, deleteBirthday, deleteEntry, useApp } from '../store/store';
-import type { EntryKind, HHMM, ID, ISODate } from '../store/types';
+import { useMemo, useState } from 'react';
+import { nextColor } from '../components/CategoryPicker';
 import { Sheet, toast } from '../components/ui';
+import { formatRelative, todayISO } from '../lib/dates';
+import { parseQuick, splitHashtag } from '../lib/quickParse';
+import { addBirthday, addCategory, addEntry, deleteBirthday, deleteEntry, findCategory, useApp } from '../store/store';
+import type { EntryKind, HHMM, ID, ISODate } from '../store/types';
 import { BirthdayFields, validBirthday, type BirthdayDraft } from './BirthdayFields';
 import { EntryFields, KIND_OPTIONS, type EntryDraft } from './EntryForm';
 
 const EXAMPLES = [
   'mañana a las 10 dentista',
+  '#2sigma reunión el lunes a las 9',
+  '#running rodaje 6 km jueves 19:00',
   'cumple de Marta 12/03',
-  'entradas Rosalía viernes 10:00',
-  'todos los lunes 9:00 reunión academia',
-  'cena el sábado a las 21:30',
-  'comprar regalo de Ana',
+  'todos los lunes 9:00 clase de inglés',
+  'llamar al banco',
 ];
 
 type Kind = EntryKind | 'birthday';
 
-export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time?: HHMM; areaId?: ID; kind?: Kind; text?: string }) {
+export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: Kind; text?: string }) {
   const state = useApp();
   const [text, setText] = useState(props.text ?? '');
   // Lo que se toca a mano manda; la fecha/hora con la que se abrió es solo el valor por defecto.
-  const [manual, setManual] = useState<Partial<EntryDraft>>(() => (props.areaId ? { areaId: props.areaId } : {}));
+  const [manual, setManual] = useState<Partial<EntryDraft>>(() => (props.categoryId ? { categoryId: props.categoryId } : {}));
   const [kindOverride, setKindOverride] = useState<Kind | undefined>(props.kind);
   const [bManual, setBManual] = useState<Partial<BirthdayDraft>>({});
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [dropTag, setDropTag] = useState(false);
 
+  const { tag, rest } = useMemo(() => splitHashtag(text), [text]);
+  const parsed = useMemo(() => parseQuick(rest), [rest]);
+  const tagged = tag ? findCategory(state, tag) : undefined;
+  // «#algo» que aún no existe: se crea al guardar (salvo que se elija otra)
+  const pending = tag && !tagged && !dropTag && !('categoryId' in manual) ? { name: tag, color: nextColor(state.categories) } : null;
 
-  const parsed = useMemo(() => parseQuick(text), [text]);
-  const kind: Kind =
-    kindOverride ??
-    (props.areaId && parsed.kind !== 'birthday' && !parsed.date
-      ? 'task'
-      : parsed.kind === 'task' && (props.date || props.time)
-        ? 'reminder'
-        : parsed.kind);
+  const kind: Kind = kindOverride ?? (parsed.kind === 'task' && (props.date || props.time) ? 'reminder' : parsed.kind);
   const defaultAlert = state.settings.defaultAlert;
-
   const presetTime = parsed.date ? undefined : props.time;
   const time = parsed.time ?? presetTime;
   const draft: EntryDraft = {
@@ -48,10 +45,8 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     time,
     endTime: parsed.endTime,
     repeat: parsed.repeat,
-    category: parsed.category,
     alert: time ? (parsed.alert ?? (kind === 'task' ? null : defaultAlert)) : null,
-    // «cena con Leyre», «en pareja»…: se comparte (se puede quitar)
-    shared: !!state.share && mentionsPartner(text, partnerName(state)),
+    categoryId: tagged?.id,
     ...manual,
   };
   if (draft.kind !== 'task' && !draft.date) draft.date = props.date ?? todayISO();
@@ -72,20 +67,19 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
       const id = addBirthday({ name: bDraft.name.trim(), day: bDraft.day!, month: bDraft.month!, year: bDraft.year, notes: bDraft.notes });
       toast(`🎂 Cumpleaños de ${bDraft.name.trim()} guardado`, { action: 'Deshacer', onAction: () => deleteBirthday(id) });
     } else {
-      const id = addEntry({ ...draft, title: draft.title.trim(), kind: kind as EntryKind });
+      const categoryId = pending ? addCategory(pending.name, pending.color) : draft.categoryId;
+      const id = addEntry({ ...draft, categoryId, title: draft.title.trim(), kind: kind as EntryKind });
       const when = draft.date ? `${formatRelative(draft.date)}${draft.time ? ` · ${draft.time}` : ''}` : 'Sin fecha';
-      toast(`${draft.shared ? '👥 ' : ''}Guardado · ${when}`, { action: 'Deshacer', onAction: () => deleteEntry(id) });
+      toast(`Guardado · ${when}`, { action: 'Deshacer', onAction: () => deleteEntry(id) });
     }
     props.onClose();
   };
-
-  const area = props.areaId ? state.areas.find((a) => a.id === props.areaId) : undefined;
 
   return (
     <Sheet
       open
       onClose={props.onClose}
-      title={area ? `Añadir a ${area.emoji} ${area.name}` : 'Añadir'}
+      title={props.date && props.date !== todayISO() ? `Añadir · ${formatRelative(props.date)}${props.time ? ` ${props.time}` : ''}` : 'Añadir'}
       footer={
         <button className="btn block" disabled={!canSave} onClick={save}>
           Guardar
@@ -93,7 +87,6 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
       }
     >
       <textarea
-        ref={inputRef}
         autoFocus
         className="textarea"
         style={{ minHeight: 56, fontSize: 'calc(17px * var(--fs))' }}
@@ -113,7 +106,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
       {!text.trim() && !props.text ? (
         <div className="mt12">
           <div className="label" style={{ marginBottom: 6 }}>
-            Escribe como hablas. Por ejemplo:
+            Escribe como hablas. Con «#» eliges la categoría:
           </div>
           <div className="examples">
             {EXAMPLES.map((ex) => (
@@ -148,6 +141,8 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
               <EntryFields
                 draft={draft}
                 showKind={false}
+                pendingCategory={pending}
+                onDropPendingCategory={() => setDropTag(true)}
                 onChange={(p) => setManual((m) => ({ ...m, ...p }))}
               />
             </>

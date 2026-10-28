@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react';
-import { files } from '../store/db';
 import { getState, updateSettings } from '../store/store';
 import type { AppState, DriveBackup } from '../store/types';
 import { applyBackup, backupData, readBackup } from './backup';
@@ -8,8 +7,7 @@ import { DRIVE_SCOPE, GoogleApiError, GoogleAuthError, googleFetch, hasScope } f
 
 /*
  * Copia automática en Google Drive: una carpeta «Día a Día · copias» en el Drive
- * de cada uno, con una copia por día (se guardan las últimas 14) y, aparte, los
- * archivos de las áreas (cada uno se sube una sola vez). Con el permiso
+ * de cada uno, con una copia por día (se guardan las últimas 14). Con el permiso
  * «drive.file» la app solo ve lo que ha creado ella, no el resto del Drive.
  */
 
@@ -115,7 +113,6 @@ export function fingerprint(s: AppState): string {
     googleCalendars: [],
     notified: {},
     settings: { ...s.settings, lastBackup: undefined, drive: undefined, google: { ...s.settings.google, lastSync: undefined } },
-    share: s.share && { ...s.share, lastSync: undefined, since: undefined, error: undefined },
   };
   const str = JSON.stringify(clean);
   let h = 0x811c9dc5;
@@ -151,7 +148,7 @@ function saveDrive(patch: Partial<DriveBackup>) {
 /* ---------- Copia ---------- */
 
 export type DriveResult =
-  | { status: 'ok'; copies: number; uploaded: number }
+  | { status: 'ok'; copies: number }
   | { status: 'unchanged' }
   | { status: 'needs-auth' }
   | { status: 'offline' }
@@ -220,23 +217,6 @@ async function doBackup(force: boolean): Promise<DriveResult> {
     const folder = (await findFolder()) ?? (await createFolder(DRIVE_FOLDER, 'carpeta'));
     const inFolder = await childrenOf(folder);
 
-    // Los archivos de las áreas no cambian: cada uno se sube una vez.
-    let uploaded = 0;
-    const blobs: { id: string; name: string; blob: Blob }[] = [];
-    for (const d of s.docs) {
-      const blob = await files.get(d.id);
-      if (blob) blobs.push({ id: d.id, name: d.fileName || d.title, blob });
-    }
-    if (blobs.length) {
-      const sub = inFolder.find((f) => kindOf(f) === 'archivos')?.id ?? (await createFolder('Archivos', 'archivos', folder));
-      const have = new Set((await childrenOf(sub)).map((f) => f.appProperties?.doc));
-      for (const b of blobs) {
-        if (have.has(b.id)) continue;
-        await createFile({ name: b.name, parents: [sub], appProperties: { [TAG]: 'archivo', doc: b.id } }, b.blob);
-        uploaded++;
-      }
-    }
-
     // La copia del día (si ya había una de hoy, se sustituye) y fuera las más viejas.
     const day = todayISO();
     const body = new Blob([JSON.stringify(backupData(s))], { type: 'application/json' });
@@ -248,7 +228,7 @@ async function doBackup(force: boolean): Promise<DriveResult> {
 
     const kept = Math.min(copies.length, KEEP_COPIES);
     saveDrive({ last: new Date().toISOString(), hash, copies: kept, error: undefined, errorLink: undefined });
-    return { status: 'ok', copies: kept, uploaded };
+    return { status: 'ok', copies: kept };
   } catch (err) {
     return failed(err);
   }
@@ -272,32 +252,13 @@ export async function listDriveCopies(): Promise<DriveCopy[]> {
     .sort((a, b) => b.day.localeCompare(a.day));
 }
 
-/** Recupera una copia (y los archivos de las áreas que falten en este móvil). */
-export async function restoreFromDrive(copy: Pick<DriveCopy, 'id'>): Promise<{ areas: number; entries: number; docs: number; missing: number }> {
+/** Recupera una copia. */
+export async function restoreFromDrive(copy: Pick<DriveCopy, 'id'>): Promise<{ categories: number; entries: number }> {
   const data = readBackup(await (await download(copy.id)).text());
-  const folder = await findFolder();
-  const sub = folder ? (await childrenOf(folder)).find((f) => kindOf(f) === 'archivos') : undefined;
-  const inDrive = new Map((sub ? await childrenOf(sub.id) : []).map((f) => [f.appProperties?.doc, f.id]));
-  let docs = 0;
-  let missing = 0;
-  for (const d of data.state.docs ?? []) {
-    const id = inDrive.get(d.id);
-    if (!id) continue;
-    if (await files.get(d.id)) {
-      docs++;
-      continue;
-    }
-    try {
-      await files.put(d.id, await (await download(id)).blob());
-      docs++;
-    } catch {
-      missing++;
-    }
-  }
   const r = applyBackup(data);
   // Quien recupera de Drive quiere seguir teniendo la copia (desde mañana: hoy no se pisa la de hoy).
   saveDrive({ on: true, skipDay: todayISO(), error: undefined, errorLink: undefined });
-  return { ...r, docs, missing };
+  return r;
 }
 
 /* ---------- Hoja para elegir la copia (se abre desde Ajustes, la bienvenida o al volver de Google) ---------- */

@@ -24,8 +24,7 @@ function serviceWorker(): Plugin {
     name: 'diaadia-service-worker',
     apply: 'build',
     generateBundle(_options, bundle) {
-      // pdf.js (casi 2 MB) se guarda la primera vez que se abre un PDF, no al instalar.
-      const built = Object.keys(bundle).filter((f) => !f.endsWith('.map') && !/^assets\/pdf[.-]/.test(f));
+      const built = Object.keys(bundle).filter((f) => !f.endsWith('.map'));
       const template = readFileSync('src/sw/sw-template.js', 'utf8');
       const source = template
         .replace('__VERSION__', BUILD_ID)
@@ -44,7 +43,6 @@ export default defineConfig({
   },
   build: {
     target: ['es2020', 'safari15'],
-    chunkSizeWarningLimit: 1500,
   },
   test: {
     include: ['src/**/*.test.ts'],

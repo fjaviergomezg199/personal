@@ -1,85 +1,112 @@
 import { describe, expect, it } from 'vitest';
+import { legacyOf } from './migrate';
 import { normalizeState } from './store';
 import type { AppState } from './types';
 
-describe('migración de datos v1 → v3', () => {
-  const v1 = {
-    version: 1,
-    areas: [
-      { id: 'nut', name: 'Nutrición', template: 'nutrition', modules: ['menu', 'tasks', 'docs'], labels: { menu: 'Menú semanal', tasks: 'Lista de la compra' }, showOnToday: true, order: 0, emoji: '🥗', color: 'green', createdAt: '', updatedAt: '' },
-      { id: 'casa', name: 'Casa', template: 'home', modules: ['tasks', 'notes'], labels: { tasks: 'Tareas de casa' }, showOnToday: true, order: 1, emoji: '🏠', color: 'amber', createdAt: '', updatedAt: '' },
-      { id: 'run', name: 'Running', template: 'running', modules: ['plan'], showOnToday: true, order: 2, emoji: '🏃', color: 'orange', createdAt: '', updatedAt: '' },
-    ],
-    entries: [
-      { id: 'e1', kind: 'task', title: 'Leche', areaId: 'nut', repeat: 'none', alert: null, createdAt: '', updatedAt: '' },
-      { id: 'e2', kind: 'task', title: 'Pan', done: true, areaId: 'nut', repeat: 'none', alert: null, createdAt: '', updatedAt: '' },
-      { id: 'e3', kind: 'task', title: 'Limpiar nevera', areaId: 'casa', repeat: 'none', alert: null, createdAt: '', updatedAt: '' },
-      { id: 'e4', kind: 'reminder', title: 'Pagar comunidad', date: '2026-11-01', areaId: 'casa', repeat: 'monthly', alert: 900, createdAt: '', updatedAt: '' },
-      { id: 'e5', kind: 'reminder', title: 'Dentista', date: '2026-10-22', repeat: 'none', alert: 15, createdAt: '', updatedAt: '' },
-    ],
-  } as unknown as Partial<AppState>;
+/** Datos como los que hay ahora en los móviles (versión 4). */
+const v4 = {
+  version: 4,
+  settings: { name: 'Leyre', onboarded: true, todayLayout: [{ key: 'menu' }], simpleToday: true, closeDay: { remind: true, time: '22:00', entryId: 'rit' }, defaultAlert: 30 },
+  areas: [
+    { id: 'est', name: 'Estudios', emoji: '📚', color: 'violet', template: 'studies', modules: ['plan', 'tasks'], showOnToday: true, order: 0, createdAt: 'a', updatedAt: 'a' },
+    { id: 'run', name: 'Running', emoji: '🏃', color: 'orange', template: 'running', modules: ['plan', 'goals'], showOnToday: true, order: 1, createdAt: 'b', updatedAt: 'b' },
+    { id: 'nut', name: 'Nutrición', emoji: '🥗', color: 'green', template: 'nutrition', modules: ['menu', 'diary'], showOnToday: true, order: 2, menu: { meals: ['Cena'], days: {} }, createdAt: 'c', updatedAt: 'c' },
+  ],
+  entries: [
+    { id: 'e1', kind: 'event', title: 'Dentista', date: '2026-10-22', time: '10:00', repeat: 'none', alert: 60, category: 'health', createdAt: '', updatedAt: '' },
+    { id: 'e2', kind: 'task', title: 'Entregar trabajo', date: '2026-10-30', areaId: 'est', repeat: 'none', alert: null, createdAt: '', updatedAt: '' },
+    { id: 'e3', kind: 'event', title: 'Cine', date: '2026-10-25', time: '18:00', repeat: 'none', alert: 30, shared: true, by: 'Javi', createdAt: '', updatedAt: '', google: { id: 'g3', calendarId: 'primary' } },
+    { id: 'rit', kind: 'reminder', title: '🌙 Cerrar el día', date: '2026-10-21', time: '22:00', repeat: 'daily', alert: 0, ritual: 'cierre', createdAt: '', updatedAt: '', google: { id: 'gR', calendarId: 'primary' } },
+  ],
+  plan: [
+    { id: 'p1', areaId: 'run', date: '2026-10-28', time: '19:00', title: 'Rodaje suave 6 km', details: 'Ritmo 6:15', done: true, result: '6 km en 37:10', createdAt: 'x', updatedAt: 'y' },
+    { id: 'p2', areaId: 'est', date: '2026-10-29', title: 'Tema 3: El Románico', createdAt: 'x', updatedAt: 'y' },
+  ],
+  goals: [{ id: 'g1', areaId: 'run', title: 'Correr 3 veces', target: 3, period: 'week', progress: {} }],
+  listItems: [{ id: 'L1', list: 'compra', text: 'Leche', done: false, updatedAt: 1 }],
+  finance: { movements: [{ id: 'M1', scope: 'personal', kind: 'gasto', date: '2026-10-20', amount: 12, category: 'super', updatedAt: 1 }], recurring: [], accounts: {}, pending: [] },
+  foodLog: [{ id: 'f1', date: '2026-10-21', meal: 'Cena', name: 'Merluza', grams: 200, kcal: 180, protein: 36, carbs: 0, fat: 3 }],
+  share: { url: 'https://script.google.com/macros/s/x/exec', key: 'K', name: 'Hogar' },
+  habits: [{ id: 'h1', name: 'Leer', emoji: '📖', days: [], target: 1, color: 'violet', order: 0, createdAt: '' }],
+  habitLog: { h1: { '2026-10-21': 1 } },
+  birthdays: [{ id: 'b1', name: 'Marta', day: 22, month: 10, createdAt: '', updatedAt: '' }],
+  googleDeletes: [],
+} as unknown as Partial<AppState>;
 
-  const s = normalizeState(v1);
+describe('de la versión 4 a la agenda con categorías', () => {
+  const s = normalizeState(v4);
 
-  it('pasa la lista de la compra a la lista compartible', () => {
-    expect(s.version).toBe(4);
-    expect(s.listItems.filter((i) => i.list === 'compra').map((i) => [i.text, i.done])).toEqual([
-      ['Leche', false],
-      ['Pan', true],
+  it('las áreas que tenían algo pasan a ser categorías con su nombre, color y emoji', () => {
+    expect(s.version).toBe(5);
+    expect(s.categories.map((c) => [c.id, c.name, c.color, c.emoji, c.order])).toEqual([
+      ['est', 'Estudios', 'violet', '📚', 0],
+      ['run', 'Running', 'orange', '🏃', 1],
     ]);
-    const nut = s.areas.find((a) => a.id === 'nut')!;
-    expect(nut.modules).toEqual(['menu', 'diary', 'metrics', 'shopping', 'docs']);
-    expect(nut.labels?.tasks).toBeUndefined();
   });
 
-  it('las tareas sin fecha de casa van a «Tareas de casa»; lo que tiene fecha se queda en la agenda', () => {
-    expect(s.listItems.filter((i) => i.list === 'casa').map((i) => i.text)).toEqual(['Limpiar nevera']);
-    const casa = s.areas.find((a) => a.id === 'casa')!;
-    expect(casa.modules).toEqual(['shopping', 'chores', 'jointMoney', 'tasks', 'notes']);
-    expect(s.entries.map((e) => e.id)).toEqual(['e4', 'e5']);
+  it('las sesiones de los planes pasan al calendario como tareas de su categoría', () => {
+    const p1 = s.entries.find((e) => e.id === 'p1')!;
+    expect(p1).toMatchObject({ kind: 'task', title: 'Rodaje suave 6 km', date: '2026-10-28', time: '19:00', categoryId: 'run', done: true, repeat: 'none', alert: null });
+    expect(p1.notes).toBe('Ritmo 6:15\n\nResultado: 6 km en 37:10');
+    expect(s.entries.find((e) => e.id === 'p2')).toMatchObject({ categoryId: 'est', title: 'Tema 3: El Románico' });
   });
 
-  it('no toca otras áreas y crea los valores nuevos', () => {
-    expect(s.areas.find((a) => a.id === 'run')!.modules).toEqual(['plan']);
-    expect(s.metricTypes.map((m) => m.name)).toEqual(['Peso']);
-    expect(s.foodLog).toEqual([]);
-    expect(s.listPending).toEqual([]);
+  it('cada plan queda como una importación: se ve en Ajustes y se puede quitar de una vez', () => {
+    expect(s.entries.find((e) => e.id === 'p1')!.importId).toBe('v4-run');
+    expect(s.entries.find((e) => e.id === 'p2')!.importId).toBe('v4-est');
+    expect(s.imports.map((b) => [b.id, b.name, b.count])).toEqual([
+      ['v4-run', 'Plan · Running', 1],
+      ['v4-est', 'Plan · Estudios', 1],
+    ]);
+    const named = normalizeState({ ...v4, areas: [{ ...(v4 as { areas: object[] }).areas[1], labels: { plan: 'Entrenamientos' } }] } as unknown as Partial<AppState>);
+    expect(named.imports.map((b) => b.name)).toEqual(['Entrenamientos · Running', 'Plan anterior']);
   });
 
-  it('sin terminar la bienvenida no se crea el área de finanzas', () => {
-    expect(s.areas.some((a) => a.modules.includes('money'))).toBe(false);
-    expect(s.finance.movements).toEqual([]);
-    expect(s.finance.accounts.personal).toEqual({ periodStarts: [], budgets: {}, stamps: {} });
+  it('lo de la agenda sigue igual (con su categoría), sin lo del hogar compartido', () => {
+    expect(s.entries.find((e) => e.id === 'e2')!.categoryId).toBe('est');
+    const cine = s.entries.find((e) => e.id === 'e3')! as unknown as Record<string, unknown>;
+    expect(cine.shared).toBeUndefined();
+    expect(cine.by).toBeUndefined();
+    expect(cine.google).toEqual({ id: 'g3', calendarId: 'primary' });
+    expect((s.entries.find((e) => e.id === 'e1') as unknown as Record<string, unknown>).category).toBeUndefined();
   });
 
-  it('no vuelve a migrar datos ya convertidos', () => {
+  it('el aviso de «Cerrar el día» desaparece, también de Google Calendar', () => {
+    expect(s.entries.some((e) => e.id === 'rit')).toBe(false);
+    expect(s.googleDeletes).toEqual([{ id: 'gR', calendarId: 'primary' }]);
+    expect((s.settings as unknown as Record<string, unknown>).closeDay).toBeUndefined();
+    expect((s.settings as unknown as Record<string, unknown>).todayLayout).toBeUndefined();
+    expect(s.settings.defaultAlert).toBe(30);
+  });
+
+  it('hábitos y cumpleaños se quedan', () => {
+    expect(s.habits.map((h) => h.name)).toEqual(['Leer']);
+    expect(s.habitLog.h1['2026-10-21']).toBe(1);
+    expect(s.birthdays.map((b) => b.name)).toEqual(['Marta']);
+  });
+
+  it('lo que ya no se usa no se pierde: se guarda aparte', () => {
+    const legacy = legacyOf(v4)!;
+    expect(Object.keys(legacy).sort()).toEqual(['areas', 'finance', 'foodLog', 'goals', 'listItems', 'plan', 'share', 'version'].sort());
+    expect(legacy.version).toBe(4);
+    expect(legacyOf(s)).toBeNull();
+    const keys = Object.keys(s).sort();
+    expect(keys).toEqual(['birthdays', 'categories', 'entries', 'googleCalendars', 'googleDeletes', 'googleEvents', 'habitLog', 'habits', 'imports', 'notified', 'settings', 'version']);
+  });
+
+  it('no vuelve a migrar lo ya convertido', () => {
     const again = normalizeState(s);
-    expect(again.listItems).toHaveLength(3);
-    expect(again.areas.find((a) => a.id === 'nut')!.modules).toEqual(s.areas.find((a) => a.id === 'nut')!.modules);
-  });
-});
-
-describe('migración v2 → v3', () => {
-  const v2 = {
-    version: 2,
-    settings: { name: 'Leyre', onboarded: true },
-    areas: [
-      { id: 'h', name: 'Hogar', template: 'home', modules: ['shopping', 'chores', 'notes'], showOnToday: true, order: 0, emoji: '🏠', color: 'amber', createdAt: '', updatedAt: '' },
-    ],
-    listItems: [{ id: 'L1', list: 'compra', text: 'Leche', done: false, updatedAt: 1 }],
-  } as unknown as Partial<AppState>;
-  const s = normalizeState(v2);
-
-  it('añade la cuenta conjunta al hogar y un área de finanzas', () => {
-    expect(s.version).toBe(4);
-    expect(s.areas[0].modules).toEqual(['shopping', 'chores', 'jointMoney', 'notes']);
-    const money = s.areas.find((a) => a.template === 'money')!;
-    expect(money).toMatchObject({ name: 'Finanzas', modules: ['money', 'jointMoney', 'notes'], order: 1 });
-    expect(s.listItems).toHaveLength(1);
+    expect(again.entries).toEqual(s.entries);
+    expect(again.categories).toEqual(s.categories);
   });
 
-  it('solo una vez', () => {
-    const again = normalizeState(s);
-    expect(again.areas.filter((a) => a.template === 'money')).toHaveLength(1);
+  it('una copia de la versión 1 también entra', () => {
+    const v1 = normalizeState({
+      version: 1,
+      areas: [{ id: 'casa', name: 'Casa', emoji: '🏠', color: 'amber', modules: ['tasks'], order: 0 }],
+      entries: [{ id: 'x', kind: 'task', title: 'Limpiar nevera', areaId: 'casa', repeat: 'none', alert: null, createdAt: '', updatedAt: '' }],
+    } as unknown as Partial<AppState>);
+    expect(v1.categories.map((c) => c.name)).toEqual(['Casa']);
+    expect(v1.entries[0].categoryId).toBe('casa');
   });
 });

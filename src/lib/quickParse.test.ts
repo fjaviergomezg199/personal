@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanTitle, parseQuick, mentionsPartner } from './quickParse';
+import { cleanTitle, parseQuick, splitHashtag } from './quickParse';
 
 // Miércoles 21 de octubre de 2026, 10:00
 const NOW = new Date(2026, 9, 21, 10, 0);
@@ -141,14 +141,21 @@ describe('cleanTitle', () => {
   });
 });
 
-describe('planes en pareja', () => {
-  it('se reconoce cuando nombra a la otra persona o dice «en pareja»', () => {
-    expect(mentionsPartner('cena con Leyre el sábado', 'Leyre')).toBe(true);
-    expect(mentionsPartner('Cena con LEYRE', 'Leyre García')).toBe(true);
-    expect(mentionsPartner('cine en pareja el viernes')).toBe(true);
-    expect(mentionsPartner('ir juntos a por el coche')).toBe(true);
-    expect(mentionsPartner('dentista mañana a las 10', 'Leyre')).toBe(false);
-    expect(mentionsPartner('Leyrella', 'Leyre')).toBe(false);
-    expect(mentionsPartner('cena con Javi', undefined)).toBe(false);
+describe('«#categoría» al escribir', () => {
+  it('saca la etiqueta (en cualquier sitio) y deja el resto', () => {
+    expect(splitHashtag('#2sigma reunión mañana a las 10')).toEqual({ tag: '2sigma', rest: 'reunión mañana a las 10' });
+    expect(splitHashtag('rodaje 6 km #running jueves 19:00')).toEqual({ tag: 'running', rest: 'rodaje 6 km jueves 19:00' });
+    expect(splitHashtag('clase #Inglés')).toEqual({ tag: 'Inglés', rest: 'clase' });
+    expect(splitHashtag('#señora_limpieza el lunes')).toEqual({ tag: 'señora_limpieza', rest: 'el lunes' });
+  });
+
+  it('sin etiqueta, o «#» suelto o pegado a una palabra, no hace nada', () => {
+    expect(splitHashtag('dentista mañana')).toEqual({ rest: 'dentista mañana' });
+    expect(splitHashtag('llamar al # de la tienda')).toEqual({ rest: 'llamar al # de la tienda' });
+    expect(splitHashtag('pedido C#5 el viernes')).toEqual({ rest: 'pedido C#5 el viernes' });
+  });
+
+  it('con dos, la primera es la categoría', () => {
+    expect(splitHashtag('#trabajo #casa revisar')).toEqual({ tag: 'trabajo', rest: '#casa revisar' });
   });
 });

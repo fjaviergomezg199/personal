@@ -89,7 +89,7 @@ export async function runDriveBackup(opts: { manual?: boolean } = {}) {
   }
   const r = await backupToDrive({ force: opts.manual });
   if (!opts.manual) return;
-  if (r.status === 'ok') toast(`Copia guardada en tu Google Drive ✓${r.uploaded ? ` (y ${r.uploaded === 1 ? '1 archivo' : `${r.uploaded} archivos`})` : ''}`);
+  if (r.status === 'ok') toast('Copia guardada en tu Google Drive ✓');
   else if (r.status === 'needs-auth') connectGoogle({ then: 'drive-backup' });
   else if (r.status === 'offline') toast('Sin conexión: la copia se hará cuando vuelva internet.');
   else if (r.status === 'error') toast(r.message, { duration: 7000 });

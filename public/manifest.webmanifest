@@ -1,7 +1,7 @@
 {
-  "name": "Día a Día · Organizador",
+  "name": "Día a Día · Agenda",
   "short_name": "Día a Día",
-  "description": "Agenda, recordatorios, cumpleaños y tus áreas (estudios, deporte, nutrición, trabajo) en un solo sitio.",
+  "description": "Tu agenda: el día, la semana y el mes de un vistazo, cada cosa del color de su categoría. Con hábitos y planes importados en JSON.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
@@ -39,7 +39,7 @@
     {
       "name": "Añadir algo",
       "short_name": "Añadir",
-      "description": "Recordatorio, plan, tarea o cumpleaños",
+      "description": "Un plan, una tarea, un recordatorio o un cumpleaños",
       "url": "./#/hoy?nuevo=1",
       "icons": [
         {
@@ -50,36 +50,25 @@
       ]
     },
     {
-      "name": "Añadir un gasto",
-      "short_name": "Gasto",
-      "url": "./#/hoy?accion=gasto",
+      "name": "Calendario",
+      "short_name": "Calendario",
+      "url": "./#/calendario",
       "icons": [
         {
-          "src": "icons/sc-gasto.png",
+          "src": "icons/sc-calendario.png",
           "sizes": "96x96",
           "type": "image/png"
         }
       ]
     },
     {
-      "name": "Lista de la compra",
-      "short_name": "Compra",
-      "url": "./#/hoy?accion=compra",
+      "name": "Importar un plan",
+      "short_name": "Importar",
+      "description": "Un plan en JSON al calendario",
+      "url": "./#/hoy?accion=importar",
       "icons": [
         {
-          "src": "icons/sc-compra.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "Apuntar lo que he comido",
-      "short_name": "Comida",
-      "url": "./#/hoy?accion=comida",
-      "icons": [
-        {
-          "src": "icons/sc-comida.png",
+          "src": "icons/sc-importar.png",
           "sizes": "96x96",
           "type": "image/png"
         }

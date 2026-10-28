@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { changedFields, type EntryDraft } from './EntryForm';
 
-const base: EntryDraft = { kind: 'event', title: 'Cine', date: '2026-10-25', time: '18:00', repeat: 'none', alert: 30, shared: true };
+const base: EntryDraft = { kind: 'event', title: 'Cine', date: '2026-10-25', time: '18:00', repeat: 'none', alert: 30, categoryId: 'c1' };
 
 describe('guardar un plan abierto', () => {
   it('solo se guarda lo que se ha tocado', () => {

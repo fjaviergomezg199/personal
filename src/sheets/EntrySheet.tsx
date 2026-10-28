@@ -1,28 +1,26 @@
 import { CalendarPlus, Check as CheckIcon, Download, ExternalLink, Share2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Sheet, toast } from '../components/ui';
-import { categoryInfo } from '../lib/categories';
 import { formatLong, todayISO } from '../lib/dates';
 import { saveFile, shareText } from '../lib/files';
 import { googleTemplateUrl } from '../lib/google';
 import { entryToIcs, icsFileName } from '../lib/ics';
 import { isDoneOn } from '../lib/recurrence';
 import { rrule } from '../lib/sync';
-import { partnerName } from '../store/selectors';
-import { deleteEntry, restoreEntry, toggleEntryDone, updateEntry, useApp } from '../store/store';
+import { deleteEntry, getState, restoreEntry, toggleEntryDone, updateEntry, useApp } from '../store/store';
 import type { Entry, ID, ISODate } from '../store/types';
 import { changedFields, EntryFields, type EntryDraft } from './EntryForm';
 
 const KIND_TITLE: Record<Entry['kind'], string> = { reminder: 'Recordatorio', event: 'Plan', task: 'Tarea' };
 
 function toDraft(e: Entry): EntryDraft {
-  const { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important, shared } = e;
-  return { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, areaId, category, location, url, notes, important, shared };
+  const { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, categoryId, location, url, notes, important } = e;
+  return { kind, title, date, time, endTime, endDate, repeat, repeatUntil, alert, categoryId, location, url, notes, important };
 }
 
 export function entryShareText(e: Entry): string {
-  const cat = categoryInfo(e.category);
-  const lines = [`${cat ? cat.emoji + ' ' : ''}${e.title}`];
+  const cat = e.categoryId ? getState().categories.find((c) => c.id === e.categoryId) : undefined;
+  const lines = [`${cat?.emoji ? `${cat.emoji} ` : ''}${e.title}`];
   if (e.date) lines.push(`${formatLong(e.date)}${e.time ? ` · ${e.time}${e.endTime ? `–${e.endTime}` : ''}` : ''}`);
   if (e.location) lines.push(`📍 ${e.location}`);
   if (e.url) lines.push(e.url);
@@ -58,14 +56,11 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
     props.onClose();
   };
 
-  const together = !!entry.shared && !!state.share;
-  const partner = together ? partnerName(state) : undefined;
-
   const remove = () => {
     const copy = structuredClone(entry);
     deleteEntry(entry.id);
     props.onClose();
-    toast(together ? 'Borrado para los dos' : 'Borrado', { action: 'Deshacer', onAction: () => restoreEntry(copy) });
+    toast('Borrado', { action: 'Deshacer', onAction: () => restoreEntry(copy) });
   };
 
   const gUrl = entry.date
@@ -116,7 +111,7 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
       <EntryFields
         draft={draft}
         showTitle
-        startOpen={!!(entry.notes || entry.url || entry.location || entry.areaId || entry.category)}
+        startOpen={!!(entry.notes || entry.url || entry.location)}
         onChange={(p) => setDraft((d) => (d ? { ...d, ...p } : d))}
       />
 
@@ -147,13 +142,6 @@ export function EntrySheet(props: { id: ID; date?: ISODate; onClose: () => void 
           </>
         )}
       </div>
-      {together && (
-        <p className="hint center mt12">
-          👥 En pareja{partner ? ` con ${partner}` : ''}
-          {entry.by && entry.by !== state.settings.name.trim() ? ` · último cambio de ${entry.by}` : ''}
-          {state.planPending.includes(entry.id) ? ' · ⏳ pendiente de enviar' : ''}
-        </p>
-      )}
       {syncing && entry.date && (
         <p className="hint center mt12">
           {entry.google && !entry.dirty ? '✓ En tu Google Calendar' : '⏳ Pendiente de enviar a Google Calendar'}

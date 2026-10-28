@@ -24,13 +24,11 @@ const ACCENTS: Record<string, string> = {
   ó: 'o', ò: 'o', ö: 'o', ô: 'o', ú: 'u', ù: 'u', ü: 'u', û: 'u', ñ: 'n', ç: 'c',
 };
 
-/** «cena con Leyre el sábado», «en pareja», «juntos»: algo para compartir con la otra persona. */
-export function mentionsPartner(text: string, partner?: string): boolean {
-  const t = ` ${fold(text)} `;
-  if (/[^a-z0-9](?:en pareja|juntos|juntas)[^a-z0-9]/.test(t)) return true;
-  const p = partner ? fold(partner.trim().split(/\s+/)[0]) : '';
-  if (p.length < 2) return false;
-  return new RegExp(`[^a-z0-9]${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^a-z0-9]`).test(t);
+/** «#running» en lo que se escribe: el nombre de la categoría y el texto sin él. */
+export function splitHashtag(text: string): { tag?: string; rest: string } {
+  const m = /(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_.-]{0,29})/u.exec(text);
+  if (!m) return { rest: text };
+  return { tag: m[2], rest: (text.slice(0, m.index) + m[1] + text.slice(m.index + m[0].length)).replace(/\s{2,}/g, ' ').trim() };
 }
 
 /** Minúsculas y sin tildes conservando la longitud (para alinear índices). */

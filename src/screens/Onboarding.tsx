@@ -1,48 +1,51 @@
 import { Check, Plus, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { nextColor } from '../components/CategoryPicker';
 import { toast } from '../components/ui';
 import { importBackup } from '../lib/backup';
+import { fold } from '../lib/quickParse';
 import { startDriveRestore } from '../lib/syncRunner';
-import { addArea, getState, updateSettings } from '../store/store';
-import { TEMPLATES } from '../store/templates';
-import type { TemplateKey } from '../store/types';
+import { addCategory, getState, updateSettings } from '../store/store';
+import type { ColorKey } from '../store/types';
 import { InstallCard } from './Install';
 
-interface Pick {
-  uid: number;
-  key: TemplateKey;
-  name: string;
-}
+/** Ideas para empezar (se puede escribir cualquier otra). */
+const SUGGESTED: { name: string; emoji: string; color: ColorKey }[] = [
+  { name: 'Trabajo', emoji: '💼', color: 'blue' },
+  { name: 'Personal', emoji: '🙂', color: 'violet' },
+  { name: 'Deporte', emoji: '🏃', color: 'orange' },
+  { name: 'Estudios', emoji: '📚', color: 'teal' },
+  { name: 'Casa', emoji: '🏠', color: 'amber' },
+  { name: 'Salud', emoji: '🩺', color: 'green' },
+  { name: 'Familia', emoji: '❤️', color: 'rose' },
+  { name: 'Planes', emoji: '🎉', color: 'pink' },
+];
 
-const STARTERS: TemplateKey[] = ['studies', 'running', 'gym', 'nutrition', 'work', 'home', 'money'];
+interface Pick {
+  name: string;
+  emoji?: string;
+  color: ColorKey;
+}
 
 export function Onboarding() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [picks, setPicks] = useState<Pick[]>([]);
-  const [seq, setSeq] = useState(1);
+  const [custom, setCustom] = useState('');
   const restoreInput = useRef<HTMLInputElement>(null);
 
-  const toggle = (key: TemplateKey) => {
-    const has = picks.some((p) => p.key === key);
-    if (has) setPicks(picks.filter((p) => p.key !== key));
-    else {
-      const t = TEMPLATES.find((x) => x.key === key)!;
-      setPicks([...picks, { uid: seq, key, name: key === 'work' ? '' : t.name }]);
-      setSeq(seq + 1);
-    }
-  };
-
-  const addWork = () => {
-    setPicks([...picks, { uid: seq, key: 'work', name: '' }]);
-    setSeq(seq + 1);
+  const has = (n: string) => picks.some((p) => fold(p.name) === fold(n));
+  const toggle = (s: Pick) => setPicks(has(s.name) ? picks.filter((p) => fold(p.name) !== fold(s.name)) : [...picks, s]);
+  const addCustom = () => {
+    const n = custom.trim();
+    if (!n || has(n)) return setCustom('');
+    // Un color que aún no esté elegido
+    setPicks([...picks, { name: n, color: nextColor(picks) }]);
+    setCustom('');
   };
 
   const finish = () => {
-    for (const p of picks) {
-      const t = TEMPLATES.find((x) => x.key === p.key)!;
-      addArea(p.key, { name: p.name.trim() || t.name });
-    }
+    for (const p of picks) addCategory(p.name, p.color, p.emoji);
     updateSettings({ name: name.trim(), onboarded: true });
     location.hash = '#/hoy';
   };
@@ -59,7 +62,7 @@ export function Onboarding() {
         <>
           <img src="icons/icon-192.png" alt="" width={72} height={72} style={{ borderRadius: 18, marginTop: 28 }} />
           <h1>Hola 👋 Esto es Día a Día</h1>
-          <p className="lead">Tu agenda, recordatorios, cumpleaños y todo lo tuyo —estudios, deporte, nutrición, trabajo— en un solo sitio y muy fácil.</p>
+          <p className="lead">Tu agenda: el día, la semana y el mes de un vistazo, cada cosa del color de su categoría. Y tus hábitos.</p>
           <div className="field">
             <label htmlFor="ob-name">¿Cómo te llamas?</label>
             <input
@@ -95,7 +98,7 @@ export function Onboarding() {
                 if (!f) return;
                 try {
                   const r = await importBackup(f);
-                  toast(`Copia restaurada: ${r.areas} áreas y ${r.entries} elementos`);
+                  toast(`Copia restaurada: ${r.entries} cosas en el calendario y ${r.categories} categorías`);
                   location.hash = '#/hoy';
                 } catch (err) {
                   toast((err as Error).message);
@@ -108,52 +111,45 @@ export function Onboarding() {
 
       {step === 1 && (
         <>
-          <h1>¿Qué quieres organizar?</h1>
-          <p className="lead">Elige tus áreas. Podrás añadir más (o quitarlas) cuando quieras.</p>
-          <div className="stack">
-            {STARTERS.map((key) => {
-              const t = TEMPLATES.find((x) => x.key === key)!;
-              const mine = picks.filter((p) => p.key === key);
-              const on = mine.length > 0;
+          <h1>Tus categorías</h1>
+          <p className="lead">Cada cosa que apuntes puede llevar una, y sale de su color en el calendario. Elige algunas o escribe las tuyas (luego se pueden cambiar).</p>
+          <div className="chips">
+            {SUGGESTED.map((s) => {
+              const on = has(s.name);
               return (
-                <div key={key}>
-                  <button className={`template-card tone-${t.color} ${on ? 'on' : ''}`} onClick={() => toggle(key)} aria-pressed={on}>
-                    <div className="em" aria-hidden>
-                      {t.emoji}
-                    </div>
-                    <div className="grow">
-                      <div className="t">{t.name}</div>
-                      <div className="d">{t.description}</div>
-                    </div>
-                    <span className={`check ${on ? 'on' : ''} tone-${t.color}`} aria-hidden>
-                      <Check size={16} strokeWidth={3.2} />
-                    </span>
-                  </button>
-                  {on &&
-                    mine.map((p, i) => (
-                      <div key={p.uid} className="hstack" style={{ margin: '8px 0 0 12px' }}>
-                        <input
-                          className="input"
-                          value={p.name}
-                          placeholder={key === 'work' ? (i === 0 ? 'Nombre: p. ej. Academia' : 'Nombre: p. ej. Ministerio') : t.name}
-                          aria-label={`Nombre del área ${t.name}`}
-                          onChange={(e) => setPicks(picks.map((x) => (x.uid === p.uid ? { ...x, name: e.target.value } : x)))}
-                        />
-                        {key === 'work' && mine.length > 1 && (
-                          <button className="icon-btn small plain" aria-label="Quitar" onClick={() => setPicks(picks.filter((x) => x.uid !== p.uid))}>
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  {key === 'work' && on && (
-                    <button className="link-btn" style={{ margin: '6px 0 0 12px' }} onClick={addWork}>
-                      <Plus size={15} style={{ verticalAlign: -2 }} /> Añadir otro trabajo
-                    </button>
-                  )}
-                </div>
+                <button key={s.name} className={`chip cat-chip tone-${s.color} ${on ? 'sel' : ''}`} aria-pressed={on} onClick={() => toggle(s)}>
+                  <i aria-hidden />
+                  {s.emoji} {s.name}
+                  {on && <Check size={14} strokeWidth={3} />}
+                </button>
               );
             })}
+          </div>
+          {picks.filter((p) => !SUGGESTED.some((s) => fold(s.name) === fold(p.name))).length > 0 && (
+            <div className="chips mt12">
+              {picks
+                .filter((p) => !SUGGESTED.some((s) => fold(s.name) === fold(p.name)))
+                .map((p) => (
+                  <button key={p.name} className={`chip cat-chip sel tone-${p.color}`} onClick={() => toggle(p)} aria-label={`Quitar ${p.name}`}>
+                    <i aria-hidden />
+                    {p.name} <X size={14} />
+                  </button>
+                ))}
+            </div>
+          )}
+          <div className="hstack mt16">
+            <input
+              className="input"
+              value={custom}
+              maxLength={40}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addCustom()}
+              placeholder="Otra: 2Sigma, Running, Inglés…"
+              aria-label="Otra categoría"
+            />
+            <button className="btn secondary" disabled={!custom.trim()} onClick={addCustom} aria-label="Añadir categoría">
+              <Plus size={18} />
+            </button>
           </div>
           <div className="foot btn-row">
             <button className="btn secondary" onClick={() => setStep(0)}>
@@ -169,16 +165,19 @@ export function Onboarding() {
       {step === 2 && (
         <>
           <h1>¡Listo, {name.trim()}!</h1>
-          <p className="lead">Tres trucos para sacarle partido:</p>
+          <p className="lead">Cuatro trucos:</p>
           <div className="stack">
             <div className="card">
-              <b>➕ Apunta como hablas.</b> Pulsa el botón + y escribe «mañana a las 10 dentista» o «cumple de Marta 12/03». La app entiende la fecha y la hora.
+              <b>➕ Apunta como hablas.</b> Pulsa + y escribe «mañana a las 10 dentista». Con «#» eliges la categoría: «#running rodaje jueves 19:00».
             </div>
             <div className="card">
-              <b>🗓️ Tus planes de Claude, día a día.</b> En cada área, «Importar de Claude» te da el mensaje para que Claude te pase la planificación y la verás en Hoy.
+              <b>🗓️ Mes, semana o día.</b> En Calendario lo ves todo de colores; desliza a los lados para cambiar.
             </div>
             <div className="card">
-              <b>🔔 Avisos de verdad.</b> En Ajustes conecta Google Calendar: tus recordatorios irán allí con su aviso.
+              <b>📥 Importa tus planes.</b> Un plan de entrenos o de estudio en JSON (te lo puede hacer ChatGPT o Claude) va al calendario de una vez: Ajustes → Importar.
+            </div>
+            <div className="card">
+              <b>🔔 Avisos de verdad.</b> En Ajustes conecta Google Calendar: lo que apuntes irá allí con su aviso.
             </div>
           </div>
           <InstallCard />

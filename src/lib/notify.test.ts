@@ -9,8 +9,9 @@ const e = (p: Partial<Entry>): Entry => ({
 
 describe('dueAlerts', () => {
   const state = normalizeState({
+    categories: [{ id: 'c1', name: 'Conciertos', color: 'pink', emoji: '🎟️', order: 0, createdAt: '' }],
     entries: [
-      e({ category: 'tickets' }),
+      e({ categoryId: 'c1' }),
       e({ id: 'done', done: true }),
       e({ id: 'sync', google: { id: 'g', calendarId: 'primary' }, dirty: false }),
       e({ id: 'weekly', title: 'Reunión', date: '2026-10-19', time: '09:00', repeat: 'weekly', alert: 0 }),

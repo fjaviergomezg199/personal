@@ -47,7 +47,7 @@ function DriveRestoreSheet({ onClose }: { onClose: () => void }) {
     setBusy(c.id);
     try {
       const r = await restoreFromDrive(c);
-      toast(`Copia recuperada: ${r.areas} áreas, ${r.entries} elementos${r.docs ? ` y ${r.docs} archivos` : ''}${r.missing ? ` (faltan ${r.missing})` : ''}`, { duration: 6000 });
+      toast(`Copia recuperada: ${r.entries} cosas en el calendario${r.categories ? ` y ${r.categories} categorías` : ''}`, { duration: 6000 });
       onClose();
       navigate('/hoy');
     } catch (err) {
@@ -80,7 +80,7 @@ function DriveRestoreSheet({ onClose }: { onClose: () => void }) {
       {copies && copies.length > 0 && (
         <>
           <p className="small muted" style={{ marginTop: 0 }}>
-            Elige la copia. Se recupera todo: agenda, áreas, listas, finanzas, hábitos y los archivos.
+            Elige la copia. Se recupera todo: el calendario, las categorías, los cumpleaños y los hábitos.
           </p>
           <div className="list">
             {copies.map((c, i) => (

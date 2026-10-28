@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { birthdayInYear, nextBirthday, nextOccurrence, occurrencesBetween, occursOn } from './recurrence';
-import { weekKey } from './dates';
 import { entryToGoogle, rrule } from './sync';
 import { entryToIcs } from './ics';
 import type { Entry } from '../store/types';
@@ -30,10 +29,6 @@ describe('recurrencias', () => {
     expect(birthdayInYear({ day: 29, month: 2 }, 2027)).toBe('2027-02-28');
     expect(nextBirthday({ day: 12, month: 3 }, '2026-10-21')).toBe('2027-03-12');
   });
-  it('semana ISO', () => {
-    expect(weekKey('2026-10-21')).toBe('2026-W43');
-    expect(weekKey('2027-01-01')).toBe('2026-W53');
-  });
 });
 
 describe('Google y .ics', () => {
@@ -43,8 +38,12 @@ describe('Google y .ics', () => {
     expect(rrule('yearly', '2030-01-01', true)).toEqual(['RRULE:FREQ=YEARLY;UNTIL=20300101']);
   });
   it('evento con hora y aviso', () => {
-    const g = entryToGoogle({ ...base, time: '10:00', category: 'tickets' });
+    const g = entryToGoogle({ ...base, time: '10:00' }, { id: 'c1', name: 'Conciertos', color: 'pink', emoji: '🎟️', order: 0, createdAt: '' });
     expect(g.summary).toBe('🎟️ Prueba');
+    // Del color de su categoría también en Google Calendar
+    expect(g.colorId).toBe('4');
+    expect(g.description).toContain('Categoría: Conciertos');
+    expect(entryToGoogle({ ...base, time: '10:00' }).colorId).toBeUndefined();
     expect(g.start).toMatchObject({ dateTime: '2026-10-21T10:00:00' });
     expect(g.end).toMatchObject({ dateTime: '2026-10-21T10:30:00' });
     expect(g.reminders).toEqual({ useDefault: false, overrides: [{ method: 'popup', minutes: 15 }] });

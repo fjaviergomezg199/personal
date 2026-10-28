@@ -1,8 +1,9 @@
-import { Bell, CalendarCheck, CloudDownload, CloudUpload, Copy, Download, RefreshCw, Smartphone, Upload, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bell, CalendarCheck, CloudDownload, CloudUpload, Copy, Download, FileUp, Palette, Plus, RefreshCw, Smartphone, Tags, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { openSheet } from '../components/sheets';
 import { confirmDialog, SectionHead, Switch, toast } from '../components/ui';
 import { exportBackup, importBackup } from '../lib/backup';
-import { formatAlert, formatRelative, toHHMM, toISODate } from '../lib/dates';
+import { formatAlert, formatDayMonth, formatRelative, localDay, toHHMM, toISODate } from '../lib/dates';
 import { DRIVE_FOLDER, KEEP_COPIES, useDriveRunning } from '../lib/driveBackup';
 import { copyText } from '../lib/files';
 import { appBaseUrl, appOrigin, clearToken, DRIVE_SCOPE, hasScope, hasValidToken } from '../lib/google';
@@ -10,11 +11,11 @@ import { notificationPermission, requestNotificationPermission, showSystemNotifi
 import { pendingGoogleChanges } from '../lib/sync';
 import { connectGoogle, runDriveBackup, runSync, startDriveRestore, useSyncStatus } from '../lib/syncRunner';
 import { kv, requestPersistence } from '../store/db';
-import { createInitialState, replaceState, setCloseDayReminder, setGoogleData, update, updateGoogle, updateSettings, useApp } from '../store/store';
-import { closeDayLink, turnOnCloseReminder } from '../sheets/CloseDaySheet';
-import { closeDayReminderOn } from '../lib/closeDay';
-import { HOGAR_SERVER } from '../lib/config';
-import { HomeShareSheet } from '../sheets/HomeShareSheet';
+import { useToday } from '../lib/useToday';
+import { sortedCategories, upcomingBirthdays } from '../store/selectors';
+import { createInitialState, moveCategory, replaceState, setGoogleData, undoImport, update, updateGoogle, updateSettings, useApp } from '../store/store';
+import type { Category } from '../store/types';
+import { CategorySheet } from '../sheets/CategorySheet';
 import { AppearanceCard } from './Appearance';
 import { InstallCard } from './Install';
 
@@ -42,6 +43,21 @@ export function Settings() {
       <InstallCard />
 
       <div className="section">
+        <SectionHead title={<><Tags size={18} /> Categorías</>} />
+        <CategoriesCard />
+      </div>
+
+      <div className="section">
+        <SectionHead title={<><FileUp size={18} /> Importar al calendario</>} />
+        <ImportCard />
+      </div>
+
+      <div className="section">
+        <SectionHead title="🎂 Cumpleaños" />
+        <BirthdaysCard />
+      </div>
+
+      <div className="section">
         <SectionHead title={<><Bell size={18} /> Avisos</>} />
         <NotificationsCard />
       </div>
@@ -52,18 +68,13 @@ export function Settings() {
       </div>
 
       <div className="section">
-        <SectionHead title={<><Users size={18} /> Hogar compartido</>} />
-        <HomeShareCard />
-      </div>
-
-      <div className="section">
         <SectionHead title="Copia de seguridad" />
         <DriveBackupCard />
         <BackupCard />
       </div>
 
       <div className="section">
-        <SectionHead title="Apariencia" />
+        <SectionHead title={<><Palette size={18} /> Apariencia</>} />
         <AppearanceCard />
       </div>
 
@@ -78,7 +89,6 @@ export function Settings() {
 function NotificationsCard() {
   const state = useApp();
   const s = state.settings;
-  const closeOn = closeDayReminderOn(state);
   const [perm, setPerm] = useState(notificationPermission());
   const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -146,32 +156,9 @@ function NotificationsCard() {
           </select>
         </div>
       </div>
-      <div className="divider" />
-      <Switch
-        checked={closeOn}
-        label="🌙 Cerrar el día"
-        description={
-          closeOn && s.closeDay
-            ? `Aviso cada noche a las ${s.closeDay.time}: un minuto para lo que te queda de hoy, con sí o no.`
-            : 'Un aviso cada noche para dejar el día cerrado en un minuto (la tarjeta sale en Hoy igualmente).'
-        }
-        onChange={(on) => (on ? void turnOnCloseReminder(s.closeDay?.time ?? '22:00') : setCloseDayReminder(false, s.closeDay?.time ?? '22:00', ''))}
-      />
-      {closeOn && s.closeDay && (
-        <div className="field">
-          <label htmlFor="st-close">Hora del aviso</label>
-          <input
-            id="st-close"
-            className="input"
-            type="time"
-            value={s.closeDay.time}
-            onChange={(e) => e.target.value && setCloseDayReminder(true, e.target.value, closeDayLink())}
-          />
-        </div>
-      )}
       <div className="callout mt16">
-        <b>Para que te avise siempre</b>, aunque no abras la app: conecta Google Calendar aquí abajo. Tus recordatorios, planes y cumpleaños se guardan allí con su aviso y te
-        avisa la app de Google Calendar del móvil. Sin Google, los avisos de esta app saltan cuando la tienes abierta o la abres.
+        <b>Para que te avise siempre</b>, aunque no abras la app: conecta Google Calendar aquí abajo. Lo que apuntas se guarda allí con su aviso (y del color de su
+        categoría) y te avisa la app de Google Calendar del móvil. Sin Google, los avisos de esta app saltan cuando la tienes abierta o la abres.
       </div>
     </div>
   );
@@ -498,7 +485,7 @@ function BackupCard() {
           if (!ok) return;
           try {
             const r = await importBackup(f);
-            toast(`Copia restaurada: ${r.areas} áreas, ${r.entries} elementos, ${r.docs} archivos`);
+            toast(`Copia restaurada: ${r.entries} cosas en el calendario y ${r.categories} categorías`);
           } catch (err) {
             toast((err as Error).message);
           }
@@ -533,7 +520,7 @@ function AboutCard() {
         onClick={async () => {
           const ok = await confirmDialog({
             title: '¿Borrar todos los datos?',
-            message: 'Se borrará todo lo de la app en este móvil: áreas, recordatorios, cumpleaños y documentos. Haz antes una copia.',
+            message: 'Se borrará todo lo de la app en este móvil: el calendario, las categorías, los hábitos y los cumpleaños. Haz antes una copia.',
             confirm: 'Borrar todo',
             danger: true,
           });
@@ -550,37 +537,141 @@ function AboutCard() {
   );
 }
 
-function HomeShareCard() {
+function CategoriesCard() {
   const state = useApp();
-  const [open, setOpen] = useState<false | 'menu' | 'join'>(false);
-  const share = state.share;
+  const cats = sortedCategories(state);
+  const [editing, setEditing] = useState<Category | 'new' | null>(null);
+  const counts = new Map<string, number>();
+  for (const e of state.entries) if (e.categoryId) counts.set(e.categoryId, (counts.get(e.categoryId) ?? 0) + 1);
+  return (
+    <div className="card">
+      {cats.length ? (
+        <div className="list flat">
+          {cats.map((c, i) => (
+            <div key={c.id} className={`row tone-${c.color}`}>
+              <div className="lead">
+                <span className="cat-swatch" aria-hidden />
+              </div>
+              <button className="body plain-btn" onClick={() => setEditing(c)}>
+                <div className="title">
+                  {c.emoji ? `${c.emoji} ` : ''}
+                  {c.name}
+                </div>
+                <div className="meta">{counts.get(c.id) ? `${counts.get(c.id)} en el calendario` : 'Sin nada todavía'}</div>
+              </button>
+              <div className="trail">
+                <button className="icon-btn small plain" aria-label={`Subir ${c.name}`} disabled={i === 0} onClick={() => moveCategory(c.id, -1)}>
+                  <ArrowUp size={16} />
+                </button>
+                <button className="icon-btn small plain" aria-label={`Bajar ${c.name}`} disabled={i === cats.length - 1} onClick={() => moveCategory(c.id, 1)}>
+                  <ArrowDown size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="small muted" style={{ marginTop: 0 }}>
+          Trabajo, deporte, estudios… Cada cosa que guardes puede llevar una y sale de su color en el calendario. También se crean al guardar, o escribiendo «#nombre».
+        </p>
+      )}
+      <button className="btn secondary small mt12" onClick={() => setEditing('new')}>
+        <Plus size={16} /> Nueva categoría
+      </button>
+      {editing && <CategorySheet category={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+function ImportCard() {
+  const state = useApp();
+  const imports = [...state.imports].reverse();
+  const left = new Map<string, number>();
+  for (const e of state.entries) if (e.importId) left.set(e.importId, (left.get(e.importId) ?? 0) + 1);
   return (
     <div className="card">
       <p className="small muted" style={{ marginTop: 0 }}>
-        {share
-          ? share.error ??
-            `Compartís la compra, las tareas de casa, la cuenta conjunta y los planes en pareja.${share.lastSync ? ` Última sincronización: ${new Date(share.lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.` : ''}`
-          : 'Comparte con tu pareja la lista de la compra, las tareas de casa, la cuenta conjunta y los planes: lo que uno apunta, el otro lo ve.'}
+        Un plan de entrenos, de estudio o cualquier calendario en JSON (o en lista o tabla de texto): cada cosa va a su día, con su categoría y su color.
       </p>
-      {share ? (
-        <button className="btn secondary small" onClick={() => setOpen('menu')}>
-          <Users size={16} /> Código para tu pareja y opciones
-        </button>
-      ) : HOGAR_SERVER ? (
-        <div className="btn-row">
-          <button className="btn small" onClick={() => setOpen('menu')}>
-            <Users size={16} /> Compartir con mi pareja
-          </button>
-          <button className="btn secondary small" onClick={() => setOpen('join')}>
-            Tengo un código
-          </button>
+      <button className="btn small" onClick={() => openSheet({ type: 'import' })}>
+        <FileUp size={16} /> Importar al calendario
+      </button>
+      {imports.length > 0 && (
+        <div className="list flat mt12">
+          {imports.map((b) => (
+            <div key={b.id} className="row no-lead">
+              <div className="body">
+                <div className="title">{b.name}</div>
+                <div className="meta">
+                  {left.get(b.id) ?? 0} de {b.count} en el calendario · {formatRelative(localDay(b.at))}
+                </div>
+              </div>
+              <div className="trail">
+                <button
+                  className="chip mini"
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: `¿Quitar «${b.name}» del calendario?`,
+                      message: `Se borra todo lo que entró con esta importación (${left.get(b.id) ?? 0}).`,
+                      confirm: 'Quitar',
+                      danger: true,
+                    });
+                    if (ok) {
+                      undoImport(b.id);
+                      toast('Importación quitada del calendario');
+                    }
+                  }}
+                >
+                  Deshacer
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BirthdaysCard() {
+  const state = useApp();
+  const today = useToday();
+  const [all, setAll] = useState(false);
+  const list = upcomingBirthdays(state, today);
+  return (
+    <div className="card">
+      {list.length ? (
+        <div className="list flat">
+          {(all ? list : list.slice(0, 5)).map((u) => (
+            <button key={u.birthday.id} className="row tappable plain-btn" onClick={() => openSheet({ type: 'birthday', id: u.birthday.id })}>
+              <div className="lead" aria-hidden>
+                🎂
+              </div>
+              <div className="body">
+                <div className="title">{u.birthday.name}</div>
+                <div className="meta">
+                  {u.inDays === 0 ? '¡Hoy!' : u.inDays === 1 ? 'Mañana' : formatDayMonth(u.date, today)}
+                  {u.age ? ` · cumple ${u.age}` : ''}
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       ) : (
-        <button className="btn secondary small" onClick={() => setOpen('menu')}>
-          <Users size={16} /> Configurar hogar compartido
-        </button>
+        <p className="small muted" style={{ marginTop: 0 }}>
+          Salen en el calendario cada año, con los años que cumplen. Al añadir algo, escribe «cumple de Marta 12/03».
+        </p>
       )}
-      {open && <HomeShareSheet start={open === 'join' ? 'join' : undefined} onClose={() => setOpen(false)} />}
+      <div className="btn-row mt12">
+        <button className="btn secondary small" onClick={() => openSheet({ type: 'quick', kind: 'birthday' })}>
+          <Plus size={16} /> Añadir cumpleaños
+        </button>
+        {list.length > 5 && (
+          <button className="link-btn" onClick={() => setAll(!all)}>
+            {all ? 'Ver menos' : `Ver los ${list.length}`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

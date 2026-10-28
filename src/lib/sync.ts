@@ -1,9 +1,9 @@
-import { categoryInfo } from './categories';
+import { GOOGLE_COLOR_ID } from './colors';
 import { addDays, addMinutesToTime, todayISO, toHHMM, toISODate } from './dates';
 import { GoogleApiError, GoogleAuthError, gcal, hasValidToken, type GCalEvent } from './google';
 import { birthdayInYear } from './recurrence';
 import { getState, setGoogleData, update, updateGoogle } from '../store/store';
-import type { Birthday, Entry, GoogleCalendarInfo, GoogleEvent, GoogleLink, Repeat } from '../store/types';
+import type { Birthday, Category, Entry, GoogleCalendarInfo, GoogleEvent, GoogleLink, Repeat } from '../store/types';
 
 const APP_TAG = 'diaadia';
 
@@ -29,12 +29,12 @@ export function rrule(repeat: Repeat, until?: string, allDay = false): string[] 
   return [rule];
 }
 
-export function entryToGoogle(e: Entry): Partial<GCalEvent> {
+/** Un plan, tarea o recordatorio como evento de Google Calendar (del color de su categoría). */
+export function entryToGoogle(e: Entry, category?: Category): Partial<GCalEvent> {
   const tz = timeZone();
-  const cat = categoryInfo(e.category);
-  const prefix = e.kind === 'task' ? '✅ ' : cat ? `${cat.emoji} ` : '';
+  const prefix = e.kind === 'task' ? '✅ ' : category?.emoji ? `${category.emoji} ` : '';
   const summary = `${e.done ? '✓ ' : ''}${prefix}${e.title}`;
-  const description = [e.notes, e.url, '— Creado con Día a Día'].filter(Boolean).join('\n\n');
+  const description = [e.notes, e.url, category ? `Categoría: ${category.name}` : '', '— Creado con Día a Día'].filter(Boolean).join('\n\n');
   const date = e.date!;
   let start: GCalEvent['start'];
   let end: GCalEvent['end'];
@@ -54,6 +54,7 @@ export function entryToGoogle(e: Entry): Partial<GCalEvent> {
     end,
     recurrence: rrule(e.repeat, e.repeatUntil, !e.time),
     reminders: { useDefault: false, overrides: e.alert !== null && e.alert !== undefined && !e.done ? [{ method: 'popup', minutes: Math.max(0, e.alert) }] : [] },
+    ...(category ? { colorId: GOOGLE_COLOR_ID[category.color] } : {}),
     extendedProperties: { private: { [APP_TAG]: e.id } },
   };
 }
@@ -195,7 +196,8 @@ async function doSync(): Promise<SyncResult> {
             }, { silent: true });
             continue;
           }
-          const link = await upsert(e.google, entryToGoogle(e), settings.writeCalendarId || 'primary');
+          const category = e.categoryId ? getState().categories.find((c) => c.id === e.categoryId) : undefined;
+          const link = await upsert(e.google, entryToGoogle(e, category), settings.writeCalendarId || 'primary');
           update((s) => {
             const x = s.entries.find((y) => y.id === e.id);
             if (!x) {

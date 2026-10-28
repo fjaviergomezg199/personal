@@ -1,14 +1,13 @@
 import { useSyncExternalStore } from 'react';
-import type { EntryKind, FinKind, FinScope, GoogleEvent, HHMM, ID, ISODate } from '../store/types';
+import type { EntryKind, GoogleEvent, HHMM, ID, ISODate } from '../store/types';
 
 /** Hojas globales que se pueden abrir desde cualquier pantalla. */
 export type SheetRequest =
-  | { type: 'quick'; date?: ISODate; time?: HHMM; areaId?: ID; kind?: EntryKind | 'birthday'; text?: string }
+  | { type: 'quick'; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: EntryKind | 'birthday'; text?: string }
   | { type: 'entry'; id: ID; date?: ISODate }
   | { type: 'birthday'; id?: ID }
-  | { type: 'plan'; id: ID }
   | { type: 'google'; event: GoogleEvent }
-  | { type: 'movement'; id?: ID; scope?: FinScope; kind?: FinKind };
+  | { type: 'import'; text?: string };
 
 let current: SheetRequest | null = null;
 const listeners = new Set<() => void>();

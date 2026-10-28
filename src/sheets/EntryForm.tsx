@@ -1,12 +1,10 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useState } from 'react';
-import { CATEGORIES } from '../lib/categories';
+import { CategoryPicker } from '../components/CategoryPicker';
 import { ALLDAY_ALERTS, formatAlert, TIMED_ALERTS } from '../lib/dates';
 import { REPEAT_LABELS } from '../lib/recurrence';
-import { PLANS_SCRIPT } from '../lib/planSync';
-import { partnerName, sortedAreas } from '../store/selectors';
 import { getState } from '../store/store';
-import type { Entry, EntryKind, Repeat } from '../store/types';
+import type { ColorKey, Entry, EntryKind, Repeat } from '../store/types';
 
 export type EntryDraft = Pick<
   Entry,
@@ -19,25 +17,20 @@ export type EntryDraft = Pick<
   | 'repeat'
   | 'repeatUntil'
   | 'alert'
-  | 'areaId'
-  | 'category'
+  | 'categoryId'
   | 'location'
   | 'url'
   | 'notes'
   | 'important'
-  | 'shared'
 >;
 
 export const KIND_OPTIONS: { value: EntryKind; label: string; emoji: string; hint: string }[] = [
-  { value: 'reminder', label: 'Recordatorio', emoji: '⏰', hint: 'Algo que hacer a una hora o un día' },
-  { value: 'event', label: 'Plan', emoji: '📅', hint: 'Algo que pasa: cena, concierto, viaje…' },
-  { value: 'task', label: 'Tarea', emoji: '✅', hint: 'Pendiente, con fecha o sin ella' },
+  { value: 'event', label: 'Plan', emoji: '📅', hint: 'Algo que pasa: cita, clase, cena, viaje…' },
+  { value: 'task', label: 'Tarea', emoji: '✅', hint: 'Algo que hacer y marcar como hecho, con fecha o sin ella' },
+  { value: 'reminder', label: 'Recordatorio', emoji: '⏰', hint: 'Que te avise a una hora o un día' },
 ];
 
-/**
- * Solo lo que se ha cambiado desde que se abrió (así no se pisa lo que haya
- * cambiado mientras tanto el otro móvil en un plan en pareja).
- */
+/** Solo lo que se ha cambiado desde que se abrió. */
 export function changedFields(initial: EntryDraft, draft: EntryDraft): Partial<EntryDraft> {
   const out: Partial<EntryDraft> = {};
   for (const k of Object.keys({ ...initial, ...draft }) as (keyof EntryDraft)[]) {
@@ -57,42 +50,18 @@ export function fixAlert(d: EntryDraft, prevTime: string | undefined, defaultAle
   return d.alert;
 }
 
-/** «Plan en pareja»: solo si hay hogar compartido. */
-function SharedSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
-  const s = getState();
-  if (!s.share) return null;
-  const partner = partnerName(s);
-  const old = (s.share.scriptVersion ?? PLANS_SCRIPT) < PLANS_SCRIPT;
-  return (
-    <label className="switch-row mt8">
-      <div className="grow">
-        <div className="t">👥 {partner ? `Compartir con ${partner}` : 'Plan en pareja'}</div>
-        <div className="d" style={old && on ? { color: 'var(--warning)' } : undefined}>
-          {old && on
-            ? 'Se enviará cuando pongáis el código nuevo de la hoja (Ajustes → Hogar compartido).'
-            : partner
-              ? 'Le aparecerá también en su agenda.'
-              : 'Lo veréis los dos, cada uno en su móvil.'}
-        </div>
-      </div>
-      <span className="switch">
-        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
-        <span />
-      </span>
-    </label>
-  );
-}
-
 export function EntryFields(props: {
   draft: EntryDraft;
   onChange: (patch: Partial<EntryDraft>) => void;
   showTitle?: boolean;
   showKind?: boolean;
   startOpen?: boolean;
+  /** Categoría nueva escrita con «#» que se creará al guardar. */
+  pendingCategory?: { name: string; color: ColorKey } | null;
+  onDropPendingCategory?: () => void;
 }) {
   const { draft: d, onChange } = props;
   const [more, setMore] = useState(!!props.startOpen);
-  const areas = sortedAreas(getState());
   const defaultAlert = getState().settings.defaultAlert;
   const alertOptions = d.time ? TIMED_ALERTS : ALLDAY_ALERTS;
   const alertValue = d.alert !== null && !alertOptions.includes(d.alert) ? [...alertOptions, d.alert] : alertOptions;
@@ -121,7 +90,16 @@ export function EntryFields(props: {
         </div>
       )}
 
-      <div className="two" style={{ marginTop: props.showTitle ? 14 : 0 }}>
+      <div style={{ marginTop: props.showTitle ? 14 : 0 }}>
+        <CategoryPicker
+          value={d.categoryId}
+          onChange={(categoryId) => onChange({ categoryId })}
+          pending={props.pendingCategory}
+          onDropPending={props.onDropPendingCategory}
+        />
+      </div>
+
+      <div className="two mt12">
         <div className="field">
           <label htmlFor="ef-date">{d.kind === 'task' ? 'Fecha (opcional)' : 'Fecha'}</label>
           <div className="hstack">
@@ -193,8 +171,6 @@ export function EntryFields(props: {
         <p className="hint">Para que te avise el mismo día, ponle una hora.</p>
       )}
 
-      <SharedSwitch on={!!d.shared} onChange={(shared) => onChange({ shared })} />
-
       <button type="button" className="link-btn mt12" onClick={() => setMore(!more)} aria-expanded={more}>
         {more ? <ChevronUp size={16} style={{ verticalAlign: -3 }} /> : <ChevronDown size={16} style={{ verticalAlign: -3 }} />} Más opciones
       </button>
@@ -235,36 +211,6 @@ export function EntryFields(props: {
             <div className="field" style={{ marginBottom: 14 }}>
               <label htmlFor="ef-until2">Repetir hasta (opcional)</label>
               <input id="ef-until2" className="input" type="date" value={d.repeatUntil ?? ''} onChange={(e) => onChange({ repeatUntil: e.target.value || undefined })} />
-            </div>
-          )}
-
-          <div className="field">
-            <span className="label">Tipo de plan</span>
-            <div className="chips">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  className={`chip mini ${d.category === c.key ? 'on' : ''}`}
-                  onClick={() => onChange({ category: d.category === c.key ? undefined : c.key })}
-                >
-                  {c.emoji} {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {areas.length > 0 && (
-            <div className="field">
-              <label htmlFor="ef-area">Área</label>
-              <select id="ef-area" className="select" value={d.areaId ?? ''} onChange={(e) => onChange({ areaId: e.target.value || undefined })}>
-                <option value="">Ninguna</option>
-                {areas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.emoji} {a.name}
-                  </option>
-                ))}
-              </select>
             </div>
           )}
 

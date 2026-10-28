@@ -26,8 +26,6 @@ jobs:
           # Opcional: ID de cliente de Google para que la app venga ya configurada
           # (Settings → Secrets and variables → Actions → Variables).
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-          # Opcional: otro servidor de hogares (si no, el de src/lib/config.ts).
-          VITE_HOGAR_SERVER: ${{ vars.VITE_HOGAR_SERVER }}
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:

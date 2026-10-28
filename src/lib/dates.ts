@@ -98,17 +98,6 @@ export function addMinutesToTime(time: HHMM, minutes: number): HHMM {
   return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
 }
 
-/** Semana ISO: '2026-W43'. */
-export function weekKey(iso: ISODate): string {
-  const d = parseISODate(iso);
-  const thursday = new Date(d);
-  thursday.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);
-  const firstThursday = new Date(thursday.getFullYear(), 0, 4);
-  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
-  const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86400000));
-  return `${thursday.getFullYear()}-W${pad(week)}`;
-}
-
 /** «19 – 25 oct», «28 sep – 4 oct» (semana que empieza en `start`). */
 export function formatWeek(start: ISODate): string {
   const s = parseISODate(start);
@@ -116,10 +105,6 @@ export function formatWeek(start: ISODate): string {
   return s.getMonth() === e.getMonth()
     ? `${s.getDate()} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`
     : `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
-}
-
-export function monthKey(iso: ISODate): string {
-  return iso.slice(0, 7);
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

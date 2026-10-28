@@ -56,7 +56,7 @@ export function Search() {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar en todo: notas, gastos, planes…"
+          placeholder="Buscar planes, tareas, categorías, cumpleaños…"
           aria-label="Buscar"
           enterKeyHint="search"
         />

@@ -235,6 +235,32 @@ main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18
 .split-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px; color: var(--muted); }
 .split.done { background: var(--accent-soft); border-color: transparent; }
 .split.done .lbl { color: var(--accent); }
+/* Presupuestos: gastos que se van haciendo poco a poco */
+.ring { width: 44px; height: 48px; display: grid; place-items: center; }
+.ring svg { width: 28px; height: 28px; transform: rotate(-90deg); }
+.ring .tr { fill: none; stroke: var(--line-strong); stroke-width: 4; }
+.ring .ar { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.ring.warn .ar, .bud-bar.warn span, .bud-big.warn .bud-bar span { stroke: var(--warn); background: var(--warn); }
+.ring.neg .ar, .bud-bar.neg span { stroke: var(--neg); background: var(--neg); }
+.bud-bar { display: block; position: relative; height: 6px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); margin-top: 6px; overflow: visible; }
+.bud-bar span { display: block; height: 100%; max-width: 100%; border-radius: 99px; background: var(--accent); }
+.bud-bar em { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink-2); border-radius: 1px; }
+.bud-bar.big { height: 12px; }
+.bud-head { display: flex; flex-direction: column; gap: 2px; }
+.bud-head .v { font-size: 28px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.bud-add { display: grid; grid-template-columns: minmax(0, 8em) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.bud-add .inp { min-width: 0; }
+.spends { list-style: none; margin: 0; padding: 0; }
+.spends li { display: grid; grid-template-columns: minmax(0, 1fr) auto 40px; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.spends li:first-child { border-top: 0; }
+.spends .n { display: flex; flex-direction: column; min-width: 0; }
+.spends .n small { color: var(--muted); font-size: 12px; }
+.spends .a { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.spends .x { width: 40px; height: 40px; border: 0; background: none; color: var(--muted); font-size: 20px; border-radius: 10px; }
+.bud-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px 24px; }
+.bud-list button { text-align: left; border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.bud-list .t { display: flex; justify-content: space-between; gap: 8px; font-weight: 500; }
+.bud-list .t span:last-child { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 400; }
 .acc-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9.5em); align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
 .acc-in:first-of-type { border-top: 0; }
 .acc-in .nm { display: flex; flex-direction: column; min-width: 0; font-weight: 500; }
@@ -345,11 +371,9 @@ textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 'use strict';
 /* Instalada desde GitHub (sin claude.ai alrededor): todo se guarda en este dispositivo. */
 const IS_APP = !(window.claude && window.claude.use);
-const APP_VERSION = '202610291945';
+const APP_VERSION = '202610292052';
 const versionText = () => { const v = APP_VERSION; return new Date(Date.UTC(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8), +v.slice(8, 10), +v.slice(10, 12))).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 const BK_KEY = 'cuentas-claras-ultima-copia';
-/* El nombre de la app lo pone cada uno en Cuentas → Tus datos: sale arriba, en el título y al añadirla a la pantalla de inicio */
-const DEFAULT_NAME = 'Cuentas Claras';
 const lastBackup = () => { try { return localStorage.getItem(BK_KEY) || ''; } catch (e) { return ''; } };
 const markBackup = () => { try { localStorage.setItem(BK_KEY, todayISO()); } catch (e) { /* sin almacenamiento */ } };
 let persistAsked = false;
@@ -476,17 +500,23 @@ function recApplies(r, k) {
 function recMonthly(r) { let t = 0; for (let i = 0; i < 12; i++) { const k = addM(CUR, i); if (recApplies(r, k)) t += Math.max(0, recAmount(r, k)); } return t / 12; }
 const recShare = r => r.months && r.months.length ? r.months.length / 12 : 1 / (Number(r.freq) || 1);
 function recAmount(r, k) { if (r.amounts && r.amounts[k] != null) return r.amounts[k]; let a = r.amount; for (const c of (r.changes || [])) if (c.from <= k) a = c.amount; return a; }
+/* Un presupuesto (gasto «poco a poco»): cuenta lo presupuestado o lo gastado si es más; al cerrar, lo gastado */
+function budgetItem(base, limit, sp, final) {
+  const spent = r2(sum(sp, x => x.amount)), done = base.status === 'hecho';
+  return { ...base, budget: true, limit, spent, logged: sp.length, spends: sp, amount: done && final != null ? final : Math.max(limit, spent) };
+}
 function itemsFor(k) {
-  const c = C(), d = monthDoc(k), list = [], skipped = [];
+  const c = C(), d = monthDoc(k), list = [], skipped = [], sp = d.spends || {};
   for (const r of c.recurring) {
     if (!recApplies(r, k)) continue;
     const o = (d.rec || {})[r.id] || {};
     if (o.skip) { skipped.push(r); continue; }
     if (o.amount == null && !(recAmount(r, k) > 0)) continue;
-    list.push({ id: 'r:' + r.id, recId: r.id, fixed: true, type: r.type, name: r.name, cat: r.cat, acc: r.acc,
-      amount: o.amount != null ? o.amount : recAmount(r, k), day: o.day != null ? o.day : (r.day ?? null), status: o.status || 'pendiente' });
+    const base = { id: 'r:' + r.id, recId: r.id, fixed: true, type: r.type, name: r.name, cat: r.cat, acc: r.acc, day: o.day != null ? o.day : (r.day ?? null), status: o.status || 'pendiente' };
+    if (r.budget && r.type === 'gasto') list.push(budgetItem(base, o.limit != null ? o.limit : recAmount(r, k), sp[base.id] || [], o.amount));
+    else list.push({ ...base, amount: o.amount != null ? o.amount : recAmount(r, k) });
   }
-  for (const it of (d.items || [])) list.push({ ...it, fixed: false });
+  for (const it of (d.items || [])) list.push(it.budget && it.type === 'gasto' ? budgetItem({ ...it, fixed: false }, it.amount, sp[it.id] || [], it.final) : { ...it, fixed: false });
   // Lo que sobra: un traspaso automático a final de mes. En meses pasados solo queda si se marcó como hecho.
   const o = d.sweep || {}, on = sweepOn();
   // Con «lo que sobra» activo, todo el ahorro del mes es lo que sobra y lo reparte la barrita: los traspasos aparte no cuentan
@@ -625,7 +655,7 @@ async function flush(path) {
 function saveConfig() { persist('app/config', S.config); }
 function saveMonth(k) {
   const d = S.months[k];
-  if (d && !(d.items || []).length && !Object.keys(d.rec || {}).length && !d.sweep && !d.closed) delete S.months[k];
+  if (d && !(d.items || []).length && !Object.keys(d.rec || {}).length && !d.sweep && !d.closed && !Object.keys(d.spends || {}).length) delete S.months[k];
   persist('months/' + k, S.months[k] || null);
 }
 const LS_KEY = 'cuentas-claras-v1';
@@ -697,12 +727,15 @@ window.addEventListener('hashchange', () => { route(); render(); });
 let charts = {};
 /* Mes en que empiezan las cuentas: antes de él no se muestra ni se cuenta nada */
 const startK = () => (S.config && S.config.start) || null;
+/* El nombre de la app lo pone cada uno en Cuentas → Tus datos: sale arriba, en el título y al añadirla a la pantalla de inicio */
+const DEFAULT_NAME = 'Cuentas Claras';
 const appName = () => (S.config && S.config.name) || DEFAULT_NAME;
 function showName() {
   const n = appName(), el = $('#brand-name');
-  if (el.textContent !== n) el.textContent = n;
+  if (el && el.textContent !== n) el.textContent = n;
   document.title = n;
-  $('meta[name="apple-mobile-web-app-title"]').content = S.config && S.config.name ? n : 'Cuentas';
+  const m = $('meta[name="apple-mobile-web-app-title"]');
+  if (m) m.content = S.config && S.config.name ? n : 'Cuentas';
 }
 function render() {
   showName();
@@ -745,15 +778,17 @@ function alertsHtml(P) {
 function expectedBalances(k) {
   const c = C(), bal = {}; for (const a of c.accounts) bal[a.id] = a.balance || 0;
   const main = c.accounts.find(a => !isSaving(a));
-  for (const it of itemsFor(k).list) {
+  const act = it => it.budget && it.logged && it.status !== 'hecho' ? it.spent : it.amount; // de un presupuesto, lo gastado
+  const list = itemsFor(k).list;
+  for (const it of list) {
     if (it.status === 'hecho' || it.sweep || !main) continue;
-    if (it.type === 'ingreso') bal[main.id] += it.amount;
-    else if (it.type === 'gasto') bal[main.id] -= it.amount;
+    if (it.type === 'ingreso') bal[main.id] += act(it);
+    else if (it.type === 'gasto') bal[main.id] -= act(it);
     else { bal[main.id] -= it.amount; const dd = isSaving(accById(it.acc)) ? it.acc : (firstSaving() || {}).id; if (dd) bal[dd] += it.amount; }
   }
   const o = monthDoc(k).sweep || {};
   if (sweepOn() && !o.skip && o.status !== 'hecho') {
-    const A = o.amount != null ? o.amount : sweepAutoFor(k);
+    const A = o.amount != null ? o.amount : r2(sum(list.filter(x => !x.sweep && x.type !== 'ahorro'), x => (x.type === 'ingreso' ? 1 : -1) * act(x)));
     if (Math.abs(A) > 0.005) { if (main) bal[main.id] -= A; for (const [id, v] of Object.entries(distribute(k, A, id => bal[id] || 0).to)) if (id in bal) bal[id] += v; }
   }
   for (const id in bal) bal[id] = r2(bal[id]);
@@ -837,6 +872,16 @@ function goalCard() {
     <div class="small">${verdict}${!G.ok && G.reach ? ` Al ritmo previsto llegarías en ${mLong(G.reach)}.` : ''}</div></section>`;
 }
 
+function budgetsCard() {
+  const b = itemsFor(CUR).list.filter(x => x.budget);
+  if (!b.length) return '';
+  return `<section class="card s-12"><div class="card-h"><h2>Presupuestos de ${mName(CUR)}</h2><span class="sub">toca uno para apuntar un gasto</span></div><div class="bud-list">${b.map(it => {
+    const st = budState(it, CUR);
+    return `<button data-act="budget-open" data-k="${CUR}" data-key="${it.id}"><span class="t"><span>${esc(it.name)}</span><span>${eur(it.spent, { dec: 0 })} de ${eur(it.limit, { dec: 0 })}</span></span>
+      <span class="bud-bar ${st.cls}"><span style="width:${Math.min(100, st.pct * 100).toFixed(1)}%"></span>${st.time > 0 && st.time < 1 ? `<em style="left:${(st.time * 100).toFixed(1)}%"></em>` : ''}</span>
+      <span class="small ${st.left < 0 ? 'negt' : 'muted'}">${st.left < 0 ? 'Te has pasado ' + eur(-st.left) : 'Quedan ' + eur(st.left)}</span></button>`;
+  }).join('')}</div></section>`;
+}
 /* Resumen */
 function vResumen() {
   const c = C(), P = project(12), cur = itemsFor(CUR), t = totals(cur.list), end = P.rows[0];
@@ -857,6 +902,7 @@ function vResumen() {
   h += `<div class="grid">
     <section class="card s-6"><div class="card-h"><h2>${cap(mLong(CUR))}</h2><button class="link small" data-act="open-month" data-k="${CUR}">Abrir el mes →</button></div>${statsHtml(t, CUR)}${meterHtml(t)}</section>
     <section class="card s-6"><div class="card-h"><h2>Lo que tendrás</h2><span class="sub">próximos 12 meses</span></div>${projChart('res', P, 12)}</section>
+    ${budgetsCard()}
     <section class="card s-4"><div class="card-h"><h2>Cuánto ahorras</h2><span class="sub">de ${mShort(next12[0].k, true)} a ${mShort(next12[11].k, true)}</span></div>
       <div class="big3"><div><span class="v ${avgSave < 0 ? 'negt' : ''}">${eur(avgSave, { dec: 0 })}</span><span class="l">al mes de media</span></div><div><span class="v ${save12 < 0 ? 'negt' : ''}">${eur(save12, { dec: 0 })}</span><span class="l">en 12 meses</span></div><div><span class="v ${worst.t.sobra < 0 ? 'negt' : ''}">${eur(worst.t.sobra, { dec: 0 })}</span><span class="l">${mName(worst.k)}, el mes más flojo</span></div></div>
       <p class="small" style="margin:0">${capTxt}</p></section>
@@ -867,7 +913,25 @@ function vResumen() {
 }
 
 /* Mes */
+function budState(it, k) {
+  const pct = it.limit > 0 ? it.spent / it.limit : (it.spent > 0 ? 2 : 0);
+  const time = k === REAL_CUR ? TODAY / daysIn(k) : k < REAL_CUR ? 1 : 0;
+  const cls = pct > 1 ? 'neg' : (pct > 0.85 || (time && pct > time + 0.15)) ? 'warn' : '';
+  return { pct, time, cls, left: r2(it.limit - it.spent) };
+}
+function budgetRow(k, it) {
+  const st = budState(it, k), C2 = 2 * Math.PI * 11, done = it.status === 'hecho';
+  const meta = ['<span class="tag">Presupuesto</span>', st.left < 0 ? `<span class="negt">te has pasado ${eur(-st.left)}</span>` : `quedan ${eur(st.left)}`,
+    it.logged ? (it.logged === 1 ? '1 gasto' : it.logged + ' gastos') : 'sin gastos apuntados', !done && st.cls === 'warn' && st.time && st.pct > st.time + 0.15 ? 'por encima del ritmo' : ''].filter(Boolean).join(' · ');
+  return `<li class="row ${done ? 'done' : ''}">
+    <span class="ring ${st.cls}" aria-hidden="true"><svg viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/><circle class="ar" cx="14" cy="14" r="11" stroke-dasharray="${(Math.min(1, st.pct) * C2).toFixed(1)} ${C2.toFixed(1)}"/></svg></span>
+    <button class="row-main" data-act="budget-open" data-k="${k}" data-key="${it.id}"><span class="r-txt"><span class="r-name">${esc(it.name)}</span><span class="r-meta">${meta}</span>
+      <span class="bud-bar ${st.cls}"><span style="width:${Math.min(100, st.pct * 100).toFixed(1)}%"></span>${st.time > 0 && st.time < 1 ? `<em style="left:${(st.time * 100).toFixed(1)}%" title="Hoy"></em>` : ''}</span></span>
+      <span class="r-amt">${eur(it.spent)}<span class="r-of">de ${eur(it.limit)}</span></span></button>
+  </li>`;
+}
 function rowHtml(k, it, split) {
+  if (it.budget) return budgetRow(k, it);
   const done = it.status === 'hecho';
   const ref = it.sweep ? 'data-sweep="1"' : it.fixed ? `data-rec="${it.recId}"` : `data-id="${it.id}"`;
   const sign = it.type === 'ingreso' ? '+' : it.type === 'gasto' ? '−' : '';
@@ -1027,7 +1091,7 @@ function vFijos() {
     h += `<section class="card"><div class="section-h"><h2>${TYPES[type].many}</h2><span class="sub">${items.length ? items.length + (items.length === 1 ? ' fijo' : ' fijos') : ''}</span></div>
       ${items.length ? `<ul class="rows nochk">${items.map(r => {
         const a = r.amounts ? recMonthly(r) : recAmount(r, kNow(r)), share = r.amounts ? 1 : recShare(r);
-        const meta = [freqText(r), r.day ? 'día ' + r.day : '', type === 'ahorro' ? '→ ' + esc(saveName(r.acc)) : esc(r.cat || ''), r.from > CUR ? 'desde ' + mShort(r.from, true) : '', r.to ? 'hasta ' + mShort(r.to, true) : ''].filter(Boolean).join(' · ');
+        const meta = [r.budget ? '<span class="tag">Presupuesto</span>' : '', freqText(r), r.day ? 'día ' + r.day : '', type === 'ahorro' ? '→ ' + esc(saveName(r.acc)) : esc(r.cat || ''), r.from > CUR ? 'desde ' + mShort(r.from, true) : '', r.to ? 'hasta ' + mShort(r.to, true) : ''].filter(Boolean).join(' · ');
         return `<li class="row"><button class="row-main" data-act="fixed-edit" data-id="${r.id}"><span class="r-txt"><span class="r-name">${esc(r.name)}</span><span class="r-meta">${meta}${share < 1 ? ' · ≈ ' + eur(a * share, { dec: 0 }) + '/mes de media' : ''}</span></span><span class="r-amt t-${type}">${type === 'ingreso' ? '+' : type === 'gasto' ? '−' : ''}${eur(a)}</span></button></li>`;
       }).join('')}</ul>` : `<div class="empty-row">${type === 'ingreso' ? 'Tu nómina u otros ingresos que se repiten.' : type === 'gasto' ? 'Alquiler o hipoteca, luz, internet, el gimnasio, suscripciones…' : 'Lo que pasas a la cuenta de ahorro cada mes.'}</div>`}
       <div><button class="btn ghost" data-act="fixed-new" data-type="${type}">+ ${type === 'ahorro' ? 'Apartar cada mes' : 'Añadir ' + TYPES[type].one.toLowerCase() + ' fijo'}</button></div></section>`;
@@ -1081,7 +1145,7 @@ function vCuentas() {
   h += `</section><div class="grid">${goalCard().replace('card s-4', 'card s-6')}
     <section class="card s-6"><div class="card-h"><h2>Tus datos</h2></div>
       <p class="small muted" style="margin:0">${IS_APP ? `Se guardan solo en este móvil. Haz una copia de seguridad de vez en cuando y guárdala en Archivos o en iCloud Drive: si borras la app o cambias de móvil, con ella lo recuperas todo. ${lastBackup() ? 'Última copia: ' + fmtDate(lastBackup()) + '.' : 'Aún no has hecho ninguna copia.'} Versión de la app: ${versionText()}.` : S.mode === 'local' ? 'Ahora mismo se guardan solo en este navegador. Abre esta página desde claude.ai para guardarlos en tu cuenta.' : 'Se guardan en tu cuenta de Claude: los ves igual desde el iPad, el móvil o el portátil. Solo tú puedes verlos.'}</p>
-      <div class="field"><label for="f-name">Nombre de la app</label><input class="inp" id="f-name" data-setting="name" maxlength="30" autocomplete="off" enterkeyhint="done" placeholder="${DEFAULT_NAME}" value="${esc(C().name || '')}">
+      <div class="field"><label for="f-appname">Nombre de la app</label><input class="inp" id="f-appname" data-setting="name" maxlength="30" autocomplete="off" enterkeyhint="done" placeholder="${DEFAULT_NAME}" value="${esc(C().name || '')}">
         <span class="hint">El que sale arriba. El del icono del móvil se elige al añadirla a la pantalla de inicio.</span></div>
       <div class="field"><label for="f-start">Las cuentas empiezan en</label><select class="inp" id="f-start" data-setting="start"><option value="" ${!startK() ? 'selected' : ''}>Desde el principio</option>${Array.from({ length: 15 }, (_, i) => addM(REAL_CUR, i - 12)).map(k => `<option value="${k}" ${k === startK() ? 'selected' : ''}>${cap(mLong(k))}</option>`).join('')}</select>
         <span class="hint">Antes de ese mes no se muestra ni se cuenta nada: ni en el mes, ni en la previsión, ni en el histórico.</span></div>
@@ -1213,6 +1277,8 @@ function catChips(s) {
 }
 /* «Al ahorro» solo se apunta a mano si lo que sobra no se reparte solo */
 const typeOptions = s => [['gasto', 'Gasto'], ['ingreso', 'Ingreso']].concat(!sweepOn() || s.type === 'ahorro' ? [['ahorro', 'Al ahorro']] : []);
+const payField = s => s.type === 'gasto' ? `<div class="field"><span class="lbl">Cómo se gasta</span>${seg('pay', s.pay || 'once', [['once', 'Un pago'], ['budget', 'Poco a poco']])}
+  <span class="hint">${s.pay === 'budget' ? 'Es un presupuesto (ocio, súper…): durante el mes vas apuntando lo que gastas y ves cuánto te queda.' : 'Se paga de una vez: hipoteca, seguro, un recibo…'}</span></div>` : '';
 function typeFields(s) {
   if (s.type === 'ahorro') {
     const savs = C().accounts.filter(isSaving), def = firstSaving();
@@ -1256,15 +1322,21 @@ function sheetItem(s) {
       `<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button><button class="btn primary" data-act="item-save">Guardar</button>`);
   }
   const title = (s.mode === 'new' ? 'Nuevo · ' : 'Editar · ') + mLong(k);
+  const buds = s.mode === 'new' && s.type === 'gasto' ? itemsFor(k).list.filter(x => x.budget && x.status !== 'hecho') : [];
+  const into = buds.find(b => b.id === s.into);
   return sheetFrame(title,
     `${seg('type', s.type, typeOptions(s))}
-    ${amountField(s, 'Importe')}
+    ${buds.length ? `<div class="field"><span class="lbl">¿Es de un presupuesto?</span><div class="chips"><button type="button" class="chip ${!into ? 'on' : ''}" data-act="set" data-f="into" data-v="">No, va aparte</button>${buds.map(b => `<button type="button" class="chip ${into && into.id === b.id ? 'on' : ''}" data-act="set" data-f="into" data-v="${esc(b.id)}">${esc(b.name)} · quedan ${eur(Math.max(0, b.limit - b.spent), { dec: 0 })}</button>`).join('')}</div></div>` : ''}
+    ${into ? `${amountField(s, 'Importe')}<div class="field"><label for="f-name">Concepto</label><input class="inp" id="f-name" data-f="name" maxlength="50" autocomplete="off" placeholder="Cena, cine…" value="${esc(s.name)}"></div>
+      <p class="small muted" style="margin:0">Se apunta en «${esc(into.name)}», donde ahora quedan ${eur(into.limit - into.spent)}.</p>` : `
+    ${payField(s)}
+    ${amountField(s, s.type === 'gasto' && s.pay === 'budget' ? 'Presupuesto del mes' : 'Importe')}
     <div class="field"><label for="f-name">Concepto</label><input class="inp" id="f-name" data-f="name" maxlength="60" autocomplete="off" placeholder="${s.type === 'ingreso' ? 'Nómina, venta, devolución…' : s.type === 'ahorro' ? 'Traspaso al ahorro' : 'Supermercado, cena, gasolina…'}" value="${esc(s.name)}"></div>
     ${typeFields(s)}
-    <div class="two"><div class="field"><label for="f-day">Día</label><input class="inp" id="f-day" data-f="day" type="number" inputmode="numeric" min="1" max="31" placeholder="—" value="${esc(s.day)}"></div>
-    <div class="field"><span class="lbl">Estado</span>${seg('status', s.status, [['pendiente', 'Pendiente'], ['hecho', 'Hecho']])}</div></div>
+    ${s.type === 'gasto' && s.pay === 'budget' ? '' : `<div class="two"><div class="field"><label for="f-day">Día</label><input class="inp" id="f-day" data-f="day" type="number" inputmode="numeric" min="1" max="31" placeholder="—" value="${esc(s.day)}"></div>
+    <div class="field"><span class="lbl">Estado</span>${seg('status', s.status, [['pendiente', 'Pendiente'], ['hecho', 'Hecho']])}</div></div>`}
     ${s.mode === 'new' ? `<label class="switch"><input type="checkbox" id="f-repeat" data-f="repeat" ${s.repeat ? 'checked' : ''}> Se repite (pasa a Fijos)</label>
-      ${s.repeat ? freqFields(s, k) : ''}` : ''}`,
+      ${s.repeat ? freqFields(s, k) : ''}` : ''}`}`,
     `${s.mode === 'edit' ? delBtn('Borrar', 'item-del') : ''}<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button><button class="btn primary" data-act="item-save">${s.mode === 'new' ? 'Añadir' : 'Guardar'}</button>`);
 }
 function sheetFixed(s) {
@@ -1272,7 +1344,8 @@ function sheetFixed(s) {
   const minFrom = addM(CUR, -24), maxTo = addM(CUR, 60);
   return sheetFrame(r ? 'Editar fijo' : 'Nuevo fijo',
     `${seg('type', s.type, typeOptions(s))}
-    ${amountField(s, s.freq === 'variable' ? 'Importe habitual' : 'Importe cada vez')}
+    ${payField(s)}
+    ${amountField(s, s.type === 'gasto' && s.pay === 'budget' ? 'Presupuesto de cada mes' : s.freq === 'variable' ? 'Importe habitual' : 'Importe cada vez')}
     ${r && s.freq !== 'variable' ? `<div class="field"><label for="f-cf">Si cambias el importe, aplicarlo desde</label>${monthSelect('f-cf', 'changeFrom', s.changeFrom, r.from, addM(CUR, 36))}<span class="hint">Los meses anteriores se quedan como estaban.</span></div>` : ''}
     <div class="field"><label for="f-name">Concepto</label><input class="inp" id="f-name" data-f="name" maxlength="60" autocomplete="off" placeholder="${s.type === 'ingreso' ? 'Nómina' : s.type === 'ahorro' ? 'Ahorro mensual' : 'Alquiler, luz, gimnasio…'}" value="${esc(s.name)}"></div>
     ${typeFields(s)}
@@ -1322,6 +1395,20 @@ function sheetClose(s) {
       <span class="hint">Si está en negativo, pon un menos delante.</span></div>`,
     `<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button><button class="btn primary" data-act="close-save">Cerrar ${mName(k)}</button>`);
 }
+function sheetBudget(s) {
+  const k = s.k, it = itemsFor(k).list.find(x => x.id === s.key);
+  if (!it) return sheetFrame('Presupuesto', '<p class="small muted">Ya no está en este mes.</p>', `<span class="grow"></span><button class="btn" data-act="sheet-close">Cerrar</button>`);
+  const st = budState(it, k), done = it.status === 'hecho';
+  return sheetFrame(esc(it.name) + ' · ' + mName(k),
+    `<div class="bud-head"><span class="small muted">${st.left < 0 ? 'Te has pasado' : 'Te quedan'}</span><span class="v ${st.left < 0 ? 'negt' : ''}">${eur(Math.abs(st.left))}</span><span class="small muted">de ${eur(it.limit)} · gastado ${eur(it.spent)} (${Math.round(st.pct * 100)} %)${st.time > 0 && st.time < 1 ? ` · va el ${Math.round(st.time * 100)} % del mes` : ''}</span></div>
+    <span class="bud-bar big ${st.cls}"><span style="width:${Math.min(100, st.pct * 100).toFixed(1)}%"></span>${st.time > 0 && st.time < 1 ? `<em style="left:${(st.time * 100).toFixed(1)}%"></em>` : ''}</span>
+    ${done ? `<p class="small muted" style="margin:0">El mes está cerrado: cuenta lo gastado.</p>` : `<div class="field"><span class="lbl">Apuntar un gasto</span><div class="bud-add">
+      <input class="inp" id="f-amount" data-f="amount" inputmode="decimal" autocomplete="off" placeholder="0 €" value="${esc(s.amount)}" data-autofocus aria-label="Importe">
+      <input class="inp" id="f-name" data-f="name" maxlength="50" autocomplete="off" placeholder="Cena, cine…" value="${esc(s.name)}" aria-label="Concepto">
+      <button class="btn primary" data-act="spend-add">Añadir</button></div></div>`}
+    ${it.logged ? `<ul class="spends">${it.spends.slice().reverse().map(x => `<li><span class="n">${esc(x.name)}<small>${x.day ? 'día ' + x.day : ''}</small></span><span class="a">−${eur(x.amount)}</span>${done ? '<span></span>' : `<button class="x" data-act="spend-del" data-id="${x.id}" aria-label="Quitar ${esc(x.name)}">×</button>`}</li>`).join('')}</ul>` : '<p class="small muted" style="margin:0">Aún no has apuntado nada este mes.</p>'}`,
+    `<button class="btn ghost" data-act="budget-edit">${it.fixed ? 'Cambiar el presupuesto' : 'Editar'}</button><span class="grow"></span><button class="btn" data-act="sheet-close">Listo</button>`);
+}
 function sheetText(s) {
   return sheetFrame(esc(s.title), `<p class="small" style="margin:0">${esc(s.hint)}</p><textarea class="inp" id="f-text" readonly style="min-height:220px">${esc(s.text)}</textarea>`,
     `<span class="grow"></span><button class="btn" data-act="sheet-close">Cerrar</button><button class="btn primary" data-act="text-copy">Copiar</button>`);
@@ -1329,7 +1416,7 @@ function sheetText(s) {
 function renderSheet(focus) {
   const root = $('#sheet-root'), s = S.sheet;
   if (!s) { root.innerHTML = ''; document.body.classList.remove('locked'); return; }
-  const body = { item: sheetItem, fixed: sheetFixed, acc: sheetAcc, goal: sheetGoal, restore: sheetRestore, text: sheetText, close: sheetClose }[s.kind](s);
+  const body = { item: sheetItem, fixed: sheetFixed, acc: sheetAcc, goal: sheetGoal, restore: sheetRestore, text: sheetText, close: sheetClose, budget: sheetBudget }[s.kind](s);
   root.innerHTML = `<div class="scrim" data-act="sheet-close"></div><div class="sheet${focus ? ' enter' : ''}" role="dialog" aria-modal="true" aria-labelledby="sh-title">${body}</div>`;
   document.body.classList.add('locked');
   if (focus) { const f = root.querySelector('[data-autofocus]'); if (f && !f.value) f.focus({ preventScroll: true }); }
@@ -1354,7 +1441,7 @@ function openItem(k, o = {}) {
   if (o.id) {
     const it = (monthDoc(k).items || []).find(x => x.id === o.id);
     if (!it) return;
-    return openSheet({ kind: 'item', mode: 'edit', k, id: it.id, type: it.type, amount: amtStr(it.amount), name: it.name, cat: it.cat || '', day: it.day ?? '', status: it.status, acc: it.acc || '' });
+    return openSheet({ kind: 'item', mode: 'edit', k, id: it.id, type: it.type, amount: amtStr(it.amount), name: it.name, cat: it.cat || '', day: it.day ?? '', status: it.status, acc: it.acc || '', pay: it.budget ? 'budget' : 'once' });
   }
   openSheet({ kind: 'item', mode: 'new', k, type: o.type || 'gasto', amount: '', name: '', cat: '', day: k === REAL_CUR ? TODAY : '', status: k > REAL_CUR ? 'pendiente' : 'hecho', acc: '', repeat: false, freq: '1', months: [pk(k).m], amounts: {} });
 }
@@ -1365,7 +1452,7 @@ function openFixed(id, type) {
     const st = r.from > CUR ? r.from : CUR, amounts = {};
     if (r.amounts) for (let i = 0; i < 12; i++) { const k = addM(st, i), v = recApplies(r, k) ? recAmount(r, k) : 0; amounts[k] = v > 0 ? amtStr(v) : ''; }
     return openSheet({ kind: 'fixed', id, type: r.type, amount: r.amounts ? (r.amount > 0 ? amtStr(r.amount) : '') : amtStr(recAmount(r, k0)), orig: recAmount(r, k0), name: r.name, cat: r.cat || '', day: r.day ?? '',
-      freq: r.amounts ? 'variable' : r.months && r.months.length ? 'meses' : String(r.freq || 1), months: r.months ? r.months.slice() : [], amounts, from: r.from, to: r.to || '', acc: r.acc || '', changeFrom: k0 });
+      freq: r.amounts ? 'variable' : r.months && r.months.length ? 'meses' : String(r.freq || 1), months: r.months ? r.months.slice() : [], amounts, from: r.from, to: r.to || '', acc: r.acc || '', changeFrom: k0, pay: r.budget ? 'budget' : 'once' });
   }
   openSheet({ kind: 'fixed', id: null, type: type || 'gasto', amount: '', name: '', cat: '', day: '', freq: '1', months: [], amounts: {}, from: CUR, to: '', acc: '' });
 }
@@ -1399,12 +1486,14 @@ function saveItem() {
     if (Object.keys(o).length) d.rec[r.id] = o; else delete d.rec[r.id];
     saveMonth(k); closeSheet(); render(); return;
   }
+  if (s.mode === 'new' && s.type === 'gasto' && s.into) { addSpend(k, s.into, amount, s.name); closeSheet(); render(); return; }
   const name = (s.name || '').trim() || (s.type === 'ahorro' ? 'Traspaso al ahorro' : s.cat || TYPES[s.type].one);
   const cat = s.type === 'ahorro' ? '' : (s.cat || 'Otros');
   const acc = s.type === 'ahorro' ? (s.acc || null) : null;
+  const budget = s.type === 'gasto' && s.pay === 'budget';
   if (s.mode === 'edit') {
     const d = ensureMonth(k), it = d.items.find(x => x.id === s.id);
-    if (it) Object.assign(it, { type: s.type, name, cat, amount, day, status: s.status, acc });
+    if (it) Object.assign(it, { type: s.type, name, cat, amount, day, status: budget ? 'pendiente' : s.status, acc, budget });
     saveMonth(k);
   } else if (s.repeat) {
     const months = s.freq === 'meses' ? (s.months || []).slice().sort((a, b) => a - b) : null;
@@ -1412,15 +1501,16 @@ function saveItem() {
     if (months && !months.includes(pk(k).m)) return sheetError(`Marca también ${mName(k)}, o añádelo desde Fijos.`);
     let amounts = null;
     if (s.freq === 'variable') { const g = readAmounts(s); if (g.err) return sheetError(g.err); amounts = g.out; if (!(amounts[k] > 0)) amounts[k] = amount; }
-    const r = { id: uid(), type: s.type, name, cat, amount, day, freq: Number(s.freq) || 1, months, amounts, from: k, to: null, acc };
+    const r = { id: uid(), type: s.type, name, cat, amount, day, freq: Number(s.freq) || 1, months, amounts, from: k, to: null, acc, budget };
     c.recurring.push(r); saveConfig();
-    if (s.status === 'hecho') { ensureMonth(k).rec[r.id] = { status: 'hecho' }; saveMonth(k); }
+    if (s.status === 'hecho' && !budget) { ensureMonth(k).rec[r.id] = { status: 'hecho' }; saveMonth(k); }
     toast('Añadido a Fijos: aparecerá también en los próximos meses.');
   } else {
-    ensureMonth(k).items.push({ id: uid(), type: s.type, name, cat, amount, day, status: s.status, acc });
+    ensureMonth(k).items.push({ id: uid(), type: s.type, name, cat, amount, day, status: budget ? 'pendiente' : s.status, acc, budget });
     saveMonth(k);
   }
   closeSheet(); render();
+  if (budget) toast('Presupuesto creado: toca la fila para ir apuntando lo que gastas.');
 }
 function readAmounts(s) {
   const out = {}, st = gridStart(s);
@@ -1446,7 +1536,7 @@ function saveFixed() {
   const months = s.freq === 'meses' ? (s.months || []).slice().sort((a, b) => a - b) : null;
   if (months && !months.length) return sheetError('Elige al menos un mes.');
   const name = (s.name || '').trim() || (s.type === 'ahorro' ? 'Ahorro mensual' : s.cat || TYPES[s.type].one);
-  const fields = { type: s.type, name, cat: s.type === 'ahorro' ? '' : (s.cat || 'Otros'), day: parseDay(s.day), freq: Number(s.freq) || 1, months, amounts, from: s.from, to: s.to || null, acc: s.type === 'ahorro' ? (s.acc || null) : null };
+  const fields = { budget: s.type === 'gasto' && s.pay === 'budget', type: s.type, name, cat: s.type === 'ahorro' ? '' : (s.cat || 'Otros'), day: parseDay(s.day), freq: Number(s.freq) || 1, months, amounts, from: s.from, to: s.to || null, acc: s.type === 'ahorro' ? (s.acc || null) : null };
   if (!s.id) c.recurring.push({ id: uid(), amount, ...fields });
   else {
     const r = c.recurring.find(x => x.id === s.id); if (!r) return closeSheet();
@@ -1468,8 +1558,9 @@ function saveClose() {
   if (s.done) {
     for (const it of itemsFor(k).list) {
       if (it.status === 'hecho' || it.sweep) continue;
-      if (it.fixed) d.rec[it.recId] = Object.assign(d.rec[it.recId] || {}, { status: 'hecho' });
-      else { const x = d.items.find(i => i.id === it.id); if (x) x.status = 'hecho'; }
+      const fin = it.budget && it.logged ? { amount: it.spent } : {}; // de un presupuesto queda lo que de verdad se gastó
+      if (it.fixed) d.rec[it.recId] = Object.assign(d.rec[it.recId] || {}, { status: 'hecho' }, fin);
+      else { const x = d.items.find(i => i.id === it.id); if (x) { x.status = 'hecho'; if (fin.amount != null) x.final = fin.amount; } }
     }
     const o = d.sweep || {}, auto = sweepAutoFor(k);
     if (sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005) {
@@ -1481,6 +1572,13 @@ function saveClose() {
   d.closed = { at: todayISO(), total: sum(Object.values(bal)), balances: bal };
   saveMonth(k); saveConfig(); closeSheet(); render();
   toast(`${cap(mName(k))} cerrado. Saldos al día.`);
+}
+function addSpend(k, key, amount, name) {
+  const d = ensureMonth(k), sp = (d.spends ||= {}), list = (sp[key] ||= []);
+  list.push({ id: uid(), name: (name || '').trim() || 'Gasto', amount, day: k === REAL_CUR ? TODAY : null });
+  saveMonth(k);
+  const it = itemsFor(k).list.find(x => x.id === key);
+  if (it) { const left = r2(it.limit - it.spent); toast(left < 0 ? `Apuntado. Te has pasado ${eur(-left)} en ${it.name}.` : `Apuntado. Te quedan ${eur(left)} en ${it.name}.`); }
 }
 function saveAcc() {
   const s = S.sheet, c = C(), bal = parseAmount(s.amount, true);
@@ -1615,7 +1713,7 @@ function toast(msg, action) {
 /* ---------- Acciones ---------- */
 const A = {
   tab: el => go(el.dataset.v),
-  rename: () => { go('cuentas'); const f = $('#f-name'); f.scrollIntoView({ block: 'center' }); f.focus(); f.select(); },
+  rename: () => { go('cuentas'); const f = $('#f-appname'); if (!f) return; f.scrollIntoView({ block: 'center' }); f.focus(); f.select(); },
   month: el => { const n = Number(el.dataset.n); S.month = n === 0 ? CUR : addM(S.month, n); if (startK() && S.month < startK()) S.month = startK(); render(); },
   'open-month': el => openMonth(el.dataset.k),
   horizon: el => { S.horizon = Number(el.dataset.n); render(); },
@@ -1663,6 +1761,21 @@ const A = {
     openSheet({ kind: 'close', k, done: true, accs, exp });
   },
   'close-save': () => saveClose(),
+  'budget-open': el => openSheet({ kind: 'budget', k: el.dataset.k, key: el.dataset.key, amount: '', name: '' }),
+  'spend-add': () => {
+    const s = S.sheet, amount = parseAmount(s.amount);
+    if (!(amount > 0)) return sheetError('Escribe cuánto has gastado (por ejemplo 30 o 12,50+8).');
+    addSpend(s.k, s.key, amount, s.name);
+    s.amount = ''; s.name = ''; s.err = ''; renderSheet(); render();
+    const f = $('#f-amount'); if (f) f.focus({ preventScroll: true }); // listo para el siguiente, sin parpadeo
+  },
+  'spend-del': el => {
+    const s = S.sheet, d = ensureMonth(s.k), sp = d.spends || {};
+    sp[s.key] = (sp[s.key] || []).filter(x => x.id !== el.dataset.id);
+    if (!sp[s.key].length) delete sp[s.key];
+    saveMonth(s.k); renderSheet(); render();
+  },
+  'budget-edit': () => { const s = S.sheet, it = itemsFor(s.k).list.find(x => x.id === s.key); closeSheet(); if (!it) return; if (it.fixed) openFixed(it.recId); else openItem(s.k, { id: it.id }); },
   'close-undo': el => { const k = el.dataset.k, d = ensureMonth(k); delete d.closed; saveMonth(k); render(); toast(cap(mName(k)) + ' reabierto. Los saldos se quedan como están.'); },
   'split-reset': el => { const k = el.dataset.k, d = ensureMonth(k); if (d.sweep) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; } saveMonth(k); render(); },
   'sweep-settings': () => { closeSheet(); go('cuentas'); },
@@ -1786,7 +1899,8 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && S.sheet) closeSheet();
   if (e.key === 'Enter' && S.sheet && e.target.id === 'f-newcat') { e.preventDefault(); A['add-cat'](); return; }
-  if (e.key === 'Enter' && e.target.id === 'f-name') { e.preventDefault(); e.target.blur(); return; }
+  if (e.key === 'Enter' && e.target.id === 'f-appname') { e.preventDefault(); e.target.blur(); return; }
+  if (e.key === 'Enter' && S.sheet && S.sheet.kind === 'budget' && e.target.tagName === 'INPUT') { e.preventDefault(); A['spend-add'](); return; }
   if (e.key === 'Enter' && S.sheet && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') {
     const save = $('#sheet-root .sh-foot .btn.primary'); if (save) { e.preventDefault(); save.click(); }
   }

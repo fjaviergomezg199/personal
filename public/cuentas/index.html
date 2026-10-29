@@ -342,6 +342,8 @@ textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 'use strict';
 /* Instalada desde GitHub (sin claude.ai alrededor): todo se guarda en este dispositivo. */
 const IS_APP = !(window.claude && window.claude.use);
+const APP_VERSION = '202610291831';
+const versionText = () => { const v = APP_VERSION; return new Date(Date.UTC(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8), +v.slice(8, 10), +v.slice(10, 12))).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 const BK_KEY = 'cuentas-claras-ultima-copia';
 const lastBackup = () => { try { return localStorage.getItem(BK_KEY) || ''; } catch (e) { return ''; } };
 const markBackup = () => { try { localStorage.setItem(BK_KEY, todayISO()); } catch (e) { /* sin almacenamiento */ } };
@@ -1015,7 +1017,7 @@ function vCuentas() {
   }
   h += `</section><div class="grid">${goalCard().replace('card s-4', 'card s-6')}
     <section class="card s-6"><div class="card-h"><h2>Tus datos</h2></div>
-      <p class="small muted" style="margin:0">${IS_APP ? `Se guardan solo en este móvil. Haz una copia de seguridad de vez en cuando y guárdala en Archivos o en iCloud Drive: si borras la app o cambias de móvil, con ella lo recuperas todo. ${lastBackup() ? 'Última copia: ' + fmtDate(lastBackup()) + '.' : 'Aún no has hecho ninguna copia.'}` : S.mode === 'local' ? 'Ahora mismo se guardan solo en este navegador. Abre esta página desde claude.ai para guardarlos en tu cuenta.' : 'Se guardan en tu cuenta de Claude: los ves igual desde el iPad, el móvil o el portátil. Solo tú puedes verlos.'}</p>
+      <p class="small muted" style="margin:0">${IS_APP ? `Se guardan solo en este móvil. Haz una copia de seguridad de vez en cuando y guárdala en Archivos o en iCloud Drive: si borras la app o cambias de móvil, con ella lo recuperas todo. ${lastBackup() ? 'Última copia: ' + fmtDate(lastBackup()) + '.' : 'Aún no has hecho ninguna copia.'} Versión de la app: ${versionText()}.` : S.mode === 'local' ? 'Ahora mismo se guardan solo en este navegador. Abre esta página desde claude.ai para guardarlos en tu cuenta.' : 'Se guardan en tu cuenta de Claude: los ves igual desde el iPad, el móvil o el portátil. Solo tú puedes verlos.'}</p>
       <div class="field"><label for="f-start">Las cuentas empiezan en</label><select class="inp" id="f-start" data-setting="start"><option value="" ${!startK() ? 'selected' : ''}>Desde el principio</option>${Array.from({ length: 15 }, (_, i) => addM(REAL_CUR, i - 12)).map(k => `<option value="${k}" ${k === startK() ? 'selected' : ''}>${cap(mLong(k))}</option>`).join('')}</select>
         <span class="hint">Antes de ese mes no se muestra ni se cuenta nada: ni en el mes, ni en la previsión, ni en el histórico.</span></div>
       <div class="btns"><button class="btn" data-act="export-csv">Exportar a Excel (CSV)</button><button class="btn" data-act="copy-tsv">Copiar para pegar en Excel</button></div>
@@ -1689,7 +1691,32 @@ document.addEventListener('keydown', e => {
 });
 
 boot();
-if (IS_APP && 'serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+/* Actualizarse sola: al abrir y al volver a la app se mira si hay una versión nueva publicada */
+if (IS_APP && 'serviceWorker' in navigator) {
+  let reg = null, lastCheck = 0, reloading = false;
+  const reload = () => { if (reloading) return; reloading = true; location.reload(); };
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !S.sheet) reload(); });
+  async function checkUpdate() {
+    if (Date.now() - lastCheck < 60000) return;
+    lastCheck = Date.now();
+    try {
+      if (reg) reg.update().catch(() => {});
+      const html = await (await fetch('index.html?v=' + Date.now(), { cache: 'no-store' })).text();
+      const m = html.match(/APP_VERSION = '(\d+)'/);
+      if (!m || m[1] === APP_VERSION) return;
+      let tried = ''; try { tried = sessionStorage.getItem('cc-version') || ''; } catch (e) { /* sin almacenamiento */ }
+      if (tried === m[1]) return; // ya se recargó para esta versión
+      try { sessionStorage.setItem('cc-version', m[1]); } catch (e) { /* sin almacenamiento */ }
+      if (S.sheet) toast('Hay una versión nueva de la app.', { label: 'Actualizar', fn: reload }); else reload();
+    } catch (e) { /* sin conexión: ya se mirará */ }
+  }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(r => { reg = r; }).catch(() => {});
+    setTimeout(checkUpdate, 2500);
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+}
 </script>
 </body>
 </html>

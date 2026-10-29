@@ -1,5 +1,5 @@
 /* Service worker de Cuentas Claras: la app abre sin conexión y se actualiza sola cuando hay red. */
-const VERSION = '2026-10-29';
+const VERSION = '202610291831';
 const CACHE = 'cuentas-' + VERSION;
 const FONTS = 'cuentas-fuentes';
 const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
@@ -42,6 +42,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  if (url.search) return; // comprobaciones de versión (?v=…): siempre a la red, sin guardar
 
   // La página: primero la red (así llegan las versiones nuevas); sin conexión, la copia guardada.
   if (req.mode === 'navigate') {
@@ -49,7 +50,8 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         const cache = await caches.open(CACHE);
         try {
-          const fresh = await fetch(req);
+          // Sin la caché del navegador (GitHub Pages la guarda 10 minutos): así llega siempre la última versión.
+          const fresh = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' });
           if (fresh.ok) cache.put('index.html', fresh.clone());
           return fresh;
         } catch (_) {

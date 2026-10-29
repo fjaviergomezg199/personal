@@ -21,13 +21,21 @@ async function boot() {
   else if (hasValidToken()) void runSync();
   else setTimeout(() => maybeAutoReconnect(), 1200);
 
-  // En iPhone el teclado tapa lo que está fijo abajo: subimos las hojas.
+  // En iPhone el teclado no encoge la página: la tapa, y a veces iOS la sube para
+  // enseñar el campo. Las hojas se colocan con lo que de verdad se ve: encima del
+  // teclado (--kb) y con el alto visible (--vvh).
   const vv = window.visualViewport;
   if (vv) {
+    const html = document.documentElement;
     const fit = () => {
-      const kb = Math.max(0, Math.round(document.documentElement.clientHeight - vv.height - vv.offsetTop));
-      document.documentElement.style.setProperty('--kb', `${kb > 80 ? kb : 0}px`);
+      const zoomed = vv.scale > 1.05;
+      const kb = zoomed ? 0 : Math.max(0, Math.round(html.clientHeight - vv.height - vv.offsetTop));
+      const open = kb > 80;
+      html.style.setProperty('--kb', `${open ? kb : 0}px`);
+      html.style.setProperty('--vvh', `${Math.round(zoomed ? html.clientHeight : vv.height)}px`);
+      html.classList.toggle('kb-open', open);
     };
+    fit();
     vv.addEventListener('resize', fit);
     vv.addEventListener('scroll', fit);
   }

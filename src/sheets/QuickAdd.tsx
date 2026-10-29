@@ -118,13 +118,13 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
         </div>
       ) : (
         <>
-          <div className="chips mt12" style={{ marginBottom: 14 }}>
+          <div className="chips scroll mt12" style={{ marginBottom: 12 }} role="group" aria-label="Qué es">
             {KIND_OPTIONS.map((k) => (
-              <button key={k.value} type="button" className={`chip ${kind === k.value ? 'on' : ''}`} onClick={() => setKindOverride(k.value)}>
+              <button key={k.value} type="button" className={`chip mini ${kind === k.value ? 'on' : ''}`} onClick={() => setKindOverride(k.value)}>
                 {k.emoji} {k.label}
               </button>
             ))}
-            <button type="button" className={`chip ${kind === 'birthday' ? 'on' : ''}`} onClick={() => setKindOverride('birthday')}>
+            <button type="button" className={`chip mini ${kind === 'birthday' ? 'on' : ''}`} onClick={() => setKindOverride('birthday')}>
               🎂 Cumple
             </button>
           </div>

@@ -231,7 +231,9 @@ main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18
 .split-range::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
 .split-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); }
 .split-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-.split-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.split-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px; color: var(--muted); }
+.split.done { background: var(--accent-soft); border-color: transparent; }
+.split.done .lbl { color: var(--accent); }
 .acc-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9.5em); align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
 .acc-in:first-of-type { border-top: 0; }
 .acc-in .nm { display: flex; flex-direction: column; min-width: 0; font-weight: 500; }
@@ -342,7 +344,7 @@ textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 'use strict';
 /* Instalada desde GitHub (sin claude.ai alrededor): todo se guarda en este dispositivo. */
 const IS_APP = !(window.claude && window.claude.use);
-const APP_VERSION = '202610291831';
+const APP_VERSION = '202610291842';
 const versionText = () => { const v = APP_VERSION; return new Date(Date.UTC(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8), +v.slice(8, 10), +v.slice(10, 12))).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 const BK_KEY = 'cuentas-claras-ultima-copia';
 const lastBackup = () => { try { return localStorage.getItem(BK_KEY) || ''; } catch (e) { return ''; } };
@@ -484,6 +486,8 @@ function itemsFor(k) {
   for (const it of (d.items || [])) list.push({ ...it, fixed: false });
   // Lo que sobra: un traspaso automático a final de mes. En meses pasados solo queda si se marcó como hecho.
   const o = d.sweep || {}, on = sweepOn();
+  // Con «lo que sobra» activo, todo el ahorro del mes es lo que sobra y lo reparte la barrita: los traspasos aparte no cuentan
+  if (on && !o.skip) for (let i = list.length - 1; i >= 0; i--) if (list[i].type === 'ahorro') list.splice(i, 1);
   if (o.status === 'hecho' || (on && k >= CUR && !o.skip)) {
     const t0 = totals(list), auto = Math.round((t0.sobra - t0.ahorro) * 100) / 100;
     const amount = o.amount != null ? o.amount : auto;
@@ -502,6 +506,18 @@ function sweepPair() {
 }
 /* % de lo que sobra que va a la primera cuenta: el general o el de ese mes */
 const splitDefault = () => { const v = Number(sweepCfg().split); return sweepCfg().split != null && v >= 0 && v <= 100 ? v : 100; };
+/* Reparte una cantidad que sobra en un mes: a la cuenta de ahorro el % de la barrita (hasta el tope), el resto a la otra */
+function distribute(k, A, balOf) {
+  const d = sweepDest(), id0 = d ? d.id : '_save', pair = sweepPair(), to = {};
+  if (!pair || A <= 0) { to[id0] = A; return { to, capHit: false }; }
+  let a = A * splitFor(k) / 100, capHit = false;
+  const cap = Number(sweepCfg().cap) || 0;
+  if (cap > 0 && a > cap - balOf(id0)) { a = Math.max(0, cap - balOf(id0)); capHit = true; }
+  if (Math.abs(a) > 0.005) to[id0] = a;
+  if (A - a > 0.005) to[pair[1].id] = A - a;
+  return { to, capHit };
+}
+const r2 = x => Math.round(x * 100) / 100;
 const splitFor = k => { const v = (monthDoc(k).sweep || {}).split; return v != null ? Number(v) : splitDefault(); };
 const sweepCfg = () => C().sweep || { on: true, acc: null };
 const sweepOn = () => sweepCfg().on !== false;
@@ -524,7 +540,6 @@ function project(n) {
   const base = (firstSaving() || {}).id || '_save';
   if (!(base in sv)) sv[base] = 0;
   const destOf = it => { const a = accById(it.acc); return isSaving(a) ? a.id : base; };
-  const pair = sweepPair(), over = pair ? pair[1].id : null;
   const pots = () => { let aho = 0, inv = 0; for (const [id, v] of Object.entries(sv)) { if ((accById(id) || {}).kind === 'inversion') inv += v; else aho += v; } return { aho, inv, save: aho + inv }; };
   const start = { cc, ...pots() }; start.total = cc + start.save;
   const rows = [];
@@ -537,16 +552,11 @@ function project(n) {
       else if (it.type === 'gasto') cc -= it.amount;
       else { // al ahorro, también lo que sobra (o lo que falta, en negativo)
         cc -= it.amount;
-        const dest = destOf(it);
-        let toDest = it.amount;
-        // Lo que sobra se reparte según la barrita; a la de ahorro, solo hasta el tope. El resto, a la otra.
-        if (it.sweep && over && over !== dest && it.amount > 0) {
-          toDest = it.amount * splitFor(k) / 100;
-          if (sw.cap > 0 && toDest > sw.cap - sv[dest]) { toDest = Math.max(0, sw.cap - sv[dest]); capHit = true; }
-        }
-        sv[dest] += toDest;
-        if (it.amount - toDest > 0.005) sv[over] += it.amount - toDest;
-        if (it.sweep) { if (Math.abs(toDest) > 0.005) split[dest] = toDest; if (it.amount - toDest > 0.005) split[over] = it.amount - toDest; }
+        if (it.sweep) {
+          const r = distribute(k, it.amount, id => sv[id] || 0);
+          for (const [id, v] of Object.entries(r.to)) { if (!(id in sv)) sv[id] = 0; sv[id] += v; split[id] = v; }
+          if (r.capHit) capHit = true;
+        } else sv[destOf(it)] += it.amount;
       }
     }
     const p = pots();
@@ -720,6 +730,24 @@ function alertsHtml(P) {
   }
   return h;
 }
+/* Saldos que la app espera al acabar un mes: lo de hoy más lo pendiente de ese mes, con lo que sobra ya repartido */
+function expectedBalances(k) {
+  const c = C(), bal = {}; for (const a of c.accounts) bal[a.id] = a.balance || 0;
+  const main = c.accounts.find(a => !isSaving(a));
+  for (const it of itemsFor(k).list) {
+    if (it.status === 'hecho' || it.sweep || !main) continue;
+    if (it.type === 'ingreso') bal[main.id] += it.amount;
+    else if (it.type === 'gasto') bal[main.id] -= it.amount;
+    else { bal[main.id] -= it.amount; const dd = isSaving(accById(it.acc)) ? it.acc : (firstSaving() || {}).id; if (dd) bal[dd] += it.amount; }
+  }
+  const o = monthDoc(k).sweep || {};
+  if (sweepOn() && !o.skip && o.status !== 'hecho') {
+    const A = o.amount != null ? o.amount : sweepAutoFor(k);
+    if (Math.abs(A) > 0.005) { if (main) bal[main.id] -= A; for (const [id, v] of Object.entries(distribute(k, A, id => bal[id] || 0).to)) if (id in bal) bal[id] += v; }
+  }
+  for (const id in bal) bal[id] = r2(bal[id]);
+  return bal;
+}
 /* Lo que sobró (o faltó) en un mes, aunque ya haya pasado */
 function sweepAutoFor(k) { const t = totals(itemsFor(k).list.filter(x => !x.sweep)); return Math.round((t.sobra - t.ahorro) * 100) / 100; }
 function closeNotice() {
@@ -851,19 +879,36 @@ function splitBlock(o) {
     </div>
     <input type="range" class="split-range" min="0" max="100" step="5" value="${p}" style="--p:${p}%" data-split="${o.key}" aria-label="Reparto entre ${esc(a.name)} y ${esc(b.name)}" aria-valuetext="${p} % a ${esc(a.name)}, ${100 - p} % a ${esc(b.name)}">
     ${o.note ? `<div class="small muted">${o.note}</div>` : ''}
+    ${o.hint ? `<div class="small muted">${o.hint}</div>` : ''}
     <div class="split-foot">${o.foot}</div>
   </div>`;
 }
-function monthSplit(k, list) {
-  const sw = list.find(x => x.sweep), pair = sweepPair();
-  if (!sw || !pair || k < CUR || sw.status === 'hecho' || !(sw.amount > 0.005)) return '';
-  const row = project(diffM(CUR, k) + 1).rows.slice(-1)[0], own = (monthDoc(k).sweep || {}).split != null;
-  const extra = list.filter(x => x.type === 'ahorro' && x.fixed && !x.sweep);
-  const extraNote = extra.length ? `Aparte va ${extra.map(x => `«${esc(x.name)}» (${eur(x.amount)})`).join(' y ')}, fuera de la barrita. <button class="link" data-act="split-absorb" data-k="${k}">Que lo reparta todo la barrita</button>` : '';
-  return splitBlock({ key: k, pair, pct: splitFor(k), total: sw.amount, a1: row.split[pair[0].id] || 0, a2: row.split[pair[1].id] || 0,
-    title: `Reparto de lo que sobra (${eur(sw.amount)})`, sub: own ? 'solo ' + mName(k) : 'el de todos los meses',
-    note: [row.capHit ? `${esc(pair[0].name)} llega a ${eur(sweepCfg().cap, { dec: 0 })}: lo que pase va a ${esc(pair[1].name)}.` : '', extraNote].filter(Boolean).join('<br>'),
-    foot: own ? `<button class="link" data-act="split-all" data-k="${k}">Usar este reparto todos los meses</button><button class="link" data-act="split-reset" data-k="${k}">Volver al de siempre (${splitDefault()} %)</button>` : 'Si la mueves, cambia solo este mes.' });
+const dotFor = id => (accById(id) || {}).kind === 'inversion' ? 's2' : 's1';
+function savingsCard(k, list, sweepSkipped) {
+  const sw = list.find(x => x.sweep), pair = sweepPair(), o = monthDoc(k).sweep || {}, d = sweepDest(), dName = esc(d ? d.name : 'tu ahorro');
+  const change = sw ? `<button class="link" data-act="edit" data-k="${k}" data-sweep="1">Cambiar importe</button>` : '';
+  let body;
+  if (sweepSkipped) body = `<div class="empty-row">Este mes lo que sobra se queda en la cuenta. <button class="link" data-act="sweep-unskip" data-k="${k}">Pasarlo al ahorro</button></div>`;
+  else if (sw && sw.status === 'hecho') {
+    const ent = Object.entries(o.to || { [(d || {}).id || '_save']: sw.amount });
+    body = `<div class="split done"><div class="split-h"><span class="lbl">✓ Confirmado${o.confirmedAt ? ' el ' + fmtDate(o.confirmedAt) : ''}</span><span class="sub">${o.applied ? 'ya sumado a cada cuenta' : ''}</span></div>
+      <div class="split-lab">${ent.map(([id, v], i) => `<div class="${i ? 'r' : ''}"><b><span class="sdot ${dotFor(id)}"></span>${esc((accById(id) || { name: 'Ahorro' }).name)}</b><span class="split-v">${eur(v, { sign: true })}</span></div>`).join('')}</div>
+      <div class="split-foot"><button class="link" data-act="sweep-unconfirm" data-k="${k}">Deshacer</button></div></div>`;
+  } else if (!sw) body = `<div class="empty-row">${k < CUR ? 'Se confirma al cerrar el mes.' : 'Este mes no sobra nada para apartar.'}</div>`;
+  else {
+    const canConfirm = k <= CUR, own = o.split != null;
+    const confirm = canConfirm ? `<button class="btn primary" data-act="sweep-confirm" data-k="${k}">✓ Confirmar</button>` : '';
+    if (sw.amount < 0) body = `<div class="split"><div class="split-h"><span class="lbl">Este mes faltan ${eur(-sw.amount)}</span></div><div class="small">Salen de <b>${dName}</b> para cubrir el mes.</div><div class="split-foot">${confirm}${change}</div></div>`;
+    else if (pair) {
+      const row = project(diffM(CUR, k) + 1).rows.slice(-1)[0];
+      body = splitBlock({ key: k, pair, pct: splitFor(k), total: sw.amount, a1: row.split[pair[0].id] || 0, a2: row.split[pair[1].id] || 0,
+        title: 'Cómo lo repartes', sub: own ? 'solo ' + mName(k) : 'el de todos los meses',
+        note: row.capHit ? `${esc(pair[0].name)} llega a ${eur(sweepCfg().cap, { dec: 0 })}: lo que pase va a ${esc(pair[1].name)}.` : '',
+        hint: canConfirm ? 'Al confirmar, cada importe se suma a su cuenta y el reparto de este mes queda fijado.' : 'Lo confirmarás cuando llegue el mes.',
+        foot: `${confirm}${change}${own ? `<button class="link" data-act="split-all" data-k="${k}">Usar este reparto todos los meses</button><button class="link" data-act="split-reset" data-k="${k}">Volver al de siempre (${splitDefault()} %)</button>` : ''}` });
+    } else body = `<div class="split"><div class="split-lab"><div><b><span class="sdot s1"></span>${dName}</b><span class="split-v">${eur(sw.amount)}</span></div></div><div class="split-foot">${confirm}${change}</div></div>`;
+  }
+  return `<section class="card"><div class="section-h"><h2>Al ahorro</h2><span class="sub">${sw ? eur(sw.amount) + (k > CUR ? ' previsto' : '') : ''}</span></div>${body}</section>`;
 }
 function vMes() {
   const k = S.month, { list, skipped, sweepSkipped } = itemsFor(k), t = totals(list);
@@ -876,11 +921,12 @@ function vMes() {
   if (k === CUR) h += `<p class="small muted" style="margin:0">Toca el círculo cuando algo ya haya pasado por el banco. Lo pendiente es lo que cuenta para la previsión.</p>`;
   if (k > CUR) h += `<p class="small muted" style="margin:0">Mes futuro: todo es previsión. Marca algo como hecho solo si ya lo has pagado o cobrado por adelantado y está en tu saldo de hoy.</p>`;
   for (const type of ['ingreso', 'gasto', 'ahorro']) {
+    if (type === 'ahorro' && sweepOn()) { h += savingsCard(k, list, sweepSkipped); continue; }
     const items = sortItems(list.filter(i => i.type === type));
     const tot = t[type], done = t[type + 'Done'];
     const subTxt = items.length ? `${eur(tot)}${k <= CUR && done !== tot ? ' · ' + (type === 'ingreso' ? 'cobrado ' : type === 'gasto' ? 'pagado ' : 'apartado ') + eur(done) : ''}` : '';
     h += `<section class="card"><div class="section-h"><h2>${TYPES[type].many}</h2><span class="sub">${subTxt}</span></div>
-      ${items.length ? `<ul class="rows">${items.map(i => rowHtml(k, i, split)).join('')}</ul>${type === 'ahorro' ? monthSplit(k, list) : ''}` : `<div class="empty-row">${type === 'ahorro' ? 'Nada apartado este mes.' : type === 'ingreso' ? 'Sin ingresos apuntados.' : 'Sin gastos apuntados.'}</div>`}
+      ${items.length ? `<ul class="rows">${items.map(i => rowHtml(k, i, split)).join('')}</ul>` : `<div class="empty-row">${type === 'ahorro' ? 'Nada apartado este mes.' : type === 'ingreso' ? 'Sin ingresos apuntados.' : 'Sin gastos apuntados.'}</div>`}
       <div><button class="btn ghost" data-act="add" data-type="${type}" data-k="${k}">+ ${type === 'ahorro' ? 'Apartar al ahorro' : 'Añadir ' + TYPES[type].one.toLowerCase()}</button></div>
       ${type === 'ahorro' && sweepSkipped ? `<div class="skipped">Este mes lo que sobra se queda en la cuenta. <button class="link" data-act="sweep-unskip" data-k="${k}">Pasarlo al ahorro</button></div>` : ''}
       ${type === 'gasto' && skipped.length ? `<div class="skipped">Quitados solo este mes: ${skipped.map(r => `<span>${esc(r.name)} <button class="link" data-act="unskip" data-k="${k}" data-rec="${r.id}">volver a poner</button></span>`).join('')}</div>` : ''}
@@ -957,10 +1003,16 @@ function vFijos() {
     <p class="small muted" style="margin:0">Lo que se repite: entra solo en cada mes y en la previsión. Si un mes es distinto, cámbialo desde ese mes.</p>`;
   h += `<div class="stats"><div class="stat"><span class="lbl">Ingresos fijos</span><span class="val pos">${eur(inc, { dec: 0, sign: true })}</span><span class="sub">al mes</span></div>
     <div class="stat"><span class="lbl">Gastos fijos</span><span class="val">${exp ? '−' : ''}${eur(exp, { dec: 0 })}</span><span class="sub">al mes</span></div>
-    <div class="stat"><span class="lbl">Al ahorro</span><span class="val">${eur(sav, { dec: 0 })}</span><span class="sub">al mes</span></div>
-    <div class="stat"><span class="lbl">Queda libre</span><span class="val ${inc - exp - sav < 0 ? 'negt' : ''}">${eur(inc - exp - sav, { dec: 0 })}</span><span class="sub">para el día a día</span></div></div>`;
+    ${sweepOn() ? `<div class="stat"><span class="lbl">Sobra</span><span class="val ${inc - exp < 0 ? 'negt' : ''}">${eur(inc - exp, { dec: 0 })}</span><span class="sub">al mes, solo con los fijos</span></div>
+    <div class="stat"><span class="lbl">Al año</span><span class="val ${inc - exp < 0 ? 'negt' : ''}">${eur((inc - exp) * 12, { dec: 0 })}</span><span class="sub">con solo los fijos</span></div></div>`
+    : `<div class="stat"><span class="lbl">Al ahorro</span><span class="val">${eur(sav, { dec: 0 })}</span><span class="sub">al mes</span></div>
+    <div class="stat"><span class="lbl">Queda libre</span><span class="val ${inc - exp - sav < 0 ? 'negt' : ''}">${eur(inc - exp - sav, { dec: 0 })}</span><span class="sub">para el día a día</span></div></div>`}`;
   for (const type of ['ingreso', 'gasto', 'ahorro']) {
     const items = active.filter(r => r.type === type).sort((a, b) => recAmount(b, kNow(b)) - recAmount(a, kNow(a)));
+    if (type === 'ahorro' && sweepOn()) {
+      if (items.length) h += `<section class="card"><div class="section-h"><h2>Al ahorro</h2></div><p class="small muted" style="margin:0">No cuentan: todo lo que sobra cada mes se reparte con la barrita de «Al ahorro». Puedes borrarlos.</p><ul class="rows nochk">${items.map(r => `<li class="row pend"><button class="row-main" data-act="fixed-edit" data-id="${r.id}"><span class="r-txt"><span class="r-name">${esc(r.name)}</span><span class="r-meta">no cuenta</span></span><span class="r-amt">${eur(recAmount(r, kNow(r)))}</span></button></li>`).join('')}</ul></section>`;
+      continue;
+    }
     h += `<section class="card"><div class="section-h"><h2>${TYPES[type].many}</h2><span class="sub">${items.length ? items.length + (items.length === 1 ? ' fijo' : ' fijos') : ''}</span></div>
       ${items.length ? `<ul class="rows nochk">${items.map(r => {
         const a = r.amounts ? recMonthly(r) : recAmount(r, kNow(r)), share = r.amounts ? 1 : recShare(r);
@@ -1146,6 +1198,8 @@ function catChips(s) {
   return `<div class="field"><span class="lbl">Categoría</span><div class="chips">${list.map(c => `<button type="button" class="chip ${c === s.cat ? 'on' : ''}" data-act="set" data-f="cat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}
     <span class="chip-new"><input id="f-newcat" data-f="newcat" placeholder="Otra…" maxlength="24" value="${esc(s.newcat || '')}" aria-label="Nueva categoría"><button type="button" class="chip" data-act="add-cat">Añadir</button></span></div></div>`;
 }
+/* «Al ahorro» solo se apunta a mano si lo que sobra no se reparte solo */
+const typeOptions = s => [['gasto', 'Gasto'], ['ingreso', 'Ingreso']].concat(!sweepOn() || s.type === 'ahorro' ? [['ahorro', 'Al ahorro']] : []);
 function typeFields(s) {
   if (s.type === 'ahorro') {
     const savs = C().accounts.filter(isSaving), def = firstSaving();
@@ -1190,7 +1244,7 @@ function sheetItem(s) {
   }
   const title = (s.mode === 'new' ? 'Nuevo · ' : 'Editar · ') + mLong(k);
   return sheetFrame(title,
-    `${seg('type', s.type, [['gasto', 'Gasto'], ['ingreso', 'Ingreso'], ['ahorro', 'Al ahorro']])}
+    `${seg('type', s.type, typeOptions(s))}
     ${amountField(s, 'Importe')}
     <div class="field"><label for="f-name">Concepto</label><input class="inp" id="f-name" data-f="name" maxlength="60" autocomplete="off" placeholder="${s.type === 'ingreso' ? 'Nómina, venta, devolución…' : s.type === 'ahorro' ? 'Traspaso al ahorro' : 'Supermercado, cena, gasolina…'}" value="${esc(s.name)}"></div>
     ${typeFields(s)}
@@ -1204,7 +1258,7 @@ function sheetFixed(s) {
   const r = s.id ? C().recurring.find(x => x.id === s.id) : null;
   const minFrom = addM(CUR, -24), maxTo = addM(CUR, 60);
   return sheetFrame(r ? 'Editar fijo' : 'Nuevo fijo',
-    `${seg('type', s.type, [['gasto', 'Gasto'], ['ingreso', 'Ingreso'], ['ahorro', 'Al ahorro']])}
+    `${seg('type', s.type, typeOptions(s))}
     ${amountField(s, s.freq === 'variable' ? 'Importe habitual' : 'Importe cada vez')}
     ${r && s.freq !== 'variable' ? `<div class="field"><label for="f-cf">Si cambias el importe, aplicarlo desde</label>${monthSelect('f-cf', 'changeFrom', s.changeFrom, r.from, addM(CUR, 36))}<span class="hint">Los meses anteriores se quedan como estaban.</span></div>` : ''}
     <div class="field"><label for="f-name">Concepto</label><input class="inp" id="f-name" data-f="name" maxlength="60" autocomplete="off" placeholder="${s.type === 'ingreso' ? 'Nómina' : s.type === 'ahorro' ? 'Ahorro mensual' : 'Alquiler, luz, gimnasio…'}" value="${esc(s.name)}"></div>
@@ -1246,12 +1300,12 @@ function sheetClose(s) {
   const auto = sweepAutoFor(k), sweepPend = sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005;
   const what = [pend.length ? (pend.length === 1 ? '1 movimiento' : pend.length + ' movimientos') : '', sweepPend ? (auto < 0 ? `lo que faltó (${eur(-auto)}), sacado del ahorro` : `lo que sobró (${eur(auto)}), pasado al ahorro`) : ''].filter(Boolean).join(' y ');
   return sheetFrame('Cerrar ' + mLong(k),
-    `<div class="fixed-note">Pon lo que ves hoy en cada cuenta. ${cap(mName(k))} queda cerrado y la previsión sigue desde estos saldos.</div>
+    `<div class="fixed-note">Comprueba que el ahorro tiene lo que la app calculaba y pon el saldo de hoy de tus cuentas corrientes. ${cap(mName(k))} queda cerrado y la previsión sigue desde aquí.</div>
     <dl class="kv"><dt>Ingresos</dt><dd>${eur(t.ingreso)}</dd><dt>Gastos</dt><dd>${eur(t.gasto)}</dd><dt>Te sobró</dt><dd class="${t.sobra < 0 ? 'negt' : ''}">${eur(t.sobra)}</dd></dl>
     ${what ? `<label class="switch"><input type="checkbox" id="f-done" data-f="done" ${s.done ? 'checked' : ''}> Dar por hecho ${what}</label>
       ${pend.length ? `<div class="small muted" style="margin-top:-8px">${pend.slice(0, 8).map(x => esc(x.name)).join(', ')}${pend.length > 8 ? '…' : ''}</div>` : ''}` : '<p class="small muted" style="margin:0">Todo lo del mes ya está marcado como hecho.</p>'}
     <div class="field"><span class="lbl">Saldos de hoy</span>
-      ${c.accounts.length ? c.accounts.map(a => `<label class="acc-in"><span class="nm">${esc(a.name)}<small>${(ACC_KINDS.find(x => x[0] === a.kind) || [, ''])[1]} · antes ${eur(a.balance)}</small></span><input class="inp" inputmode="decimal" autocomplete="off" data-acc="${a.id}" value="${esc(s.accs[a.id] ?? '')}" aria-label="Saldo de hoy en ${esc(a.name)}"></label>`).join('') : '<span class="small muted">No tienes cuentas. Añádelas en Cuentas.</span>'}
+      ${c.accounts.length ? c.accounts.map(a => `<label class="acc-in"><span class="nm">${esc(a.name)}<small>${(ACC_KINDS.find(x => x[0] === a.kind) || [, ''])[1]} · ${isSaving(a) ? 'la app calcula ' + eur(s.exp[a.id]) : 'antes ' + eur(a.balance)}</small></span><input class="inp" inputmode="decimal" autocomplete="off" data-acc="${a.id}" value="${esc(s.accs[a.id] ?? '')}" aria-label="Saldo de hoy en ${esc(a.name)}"></label>`).join('') : '<span class="small muted">No tienes cuentas. Añádelas en Cuentas.</span>'}
       <span class="hint">Si está en negativo, pon un menos delante.</span></div>`,
     `<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button><button class="btn primary" data-act="close-save">Cerrar ${mName(k)}</button>`);
 }
@@ -1405,7 +1459,10 @@ function saveClose() {
       else { const x = d.items.find(i => i.id === it.id); if (x) x.status = 'hecho'; }
     }
     const o = d.sweep || {}, auto = sweepAutoFor(k);
-    if (sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005) d.sweep = Object.assign(o, { status: 'hecho', amount: o.amount != null ? o.amount : auto, frozen: o.amount == null });
+    if (sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005) {
+      const A = o.amount != null ? o.amount : auto;
+      d.sweep = Object.assign(o, { status: 'hecho', amount: A, frozen: o.amount == null, to: distribute(k, A, id => (accById(id) || {}).balance || 0).to, applied: false, confirmedAt: todayISO() });
+    }
   }
   for (const a of c.accounts) { a.balance = bal[a.id]; a.asOf = todayISO(); }
   d.closed = { at: todayISO(), total: sum(Object.values(bal)), balances: bal };
@@ -1562,12 +1619,35 @@ const A = {
     for (const k of Object.keys(S.months)) { const d = S.months[k]; if (k >= CUR && d.sweep && d.sweep.split != null) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; saveMonth(k); } }
     saveConfig(); render(); toast(`Desde ahora, ${v} % a ${sweepPair()[0].name} y ${100 - v} % a ${sweepPair()[1].name}.`);
   },
-  'split-absorb': el => {
-    const k = el.dataset.k, c = C(), ids = itemsFor(k).list.filter(x => x.type === 'ahorro' && x.fixed && !x.sweep).map(x => x.recId);
-    for (const id of ids) { const r = c.recurring.find(x => x.id === id); if (!r) continue; if (r.from >= k) c.recurring = c.recurring.filter(x => x !== r); else r.to = addM(k, -1); }
-    saveConfig(); render(); toast('Hecho: desde ' + mName(k) + ', todo «Al ahorro» lo reparte la barrita.');
+  'sweep-confirm': el => {
+    const k = el.dataset.k, it = itemsFor(k).list.find(x => x.sweep); if (!it) return;
+    const c = C(), main = c.accounts.find(a => !isSaving(a)), { to } = distribute(k, it.amount, id => (accById(id) || {}).balance || 0);
+    if (main) { main.balance = r2(main.balance - it.amount); main.asOf = todayISO(); }
+    for (const [id, v] of Object.entries(to)) { const a = accById(id); if (a) { a.balance = r2(a.balance + v); a.asOf = todayISO(); } }
+    const d = ensureMonth(k), o = d.sweep || {};
+    d.sweep = Object.assign(o, { status: 'hecho', amount: it.amount, frozen: o.amount == null, to, applied: !!main, confirmedAt: todayISO() });
+    saveMonth(k); saveConfig(); render();
+    toast('Confirmado: ' + Object.entries(to).map(([id, v]) => `${eur(v)} a ${(accById(id) || { name: 'tu ahorro' }).name}`).join(' y ') + '.');
   },
-  'close-open': el => { const accs = {}; for (const a of C().accounts) accs[a.id] = amtStr(a.balance); openSheet({ kind: 'close', k: el.dataset.k, done: true, accs }); },
+  'sweep-unconfirm': el => {
+    const k = el.dataset.k, d = ensureMonth(k), o = d.sweep || {}; if (o.status !== 'hecho') return;
+    const was = !!o.applied;
+    if (was) {
+      const main = C().accounts.find(a => !isSaving(a));
+      if (main) main.balance = r2(main.balance + o.amount);
+      for (const [id, v] of Object.entries(o.to || {})) { const a = accById(id); if (a) a.balance = r2(a.balance - v); }
+      saveConfig();
+    }
+    delete o.status; delete o.to; delete o.applied; delete o.confirmedAt; if (o.frozen) { delete o.amount; delete o.frozen; }
+    if (Object.keys(o).length) d.sweep = o; else delete d.sweep;
+    saveMonth(k); render(); toast(was ? 'Deshecho: los saldos vuelven a como estaban.' : 'Deshecho.');
+  },
+  'close-open': el => {
+    const k = el.dataset.k, exp = expectedBalances(k), accs = {};
+    // El ahorro viene con lo que la app calcula (solo hay que confirmarlo); las corrientes, con su saldo, para poner el del banco
+    for (const a of C().accounts) accs[a.id] = amtStr(isSaving(a) ? exp[a.id] : a.balance);
+    openSheet({ kind: 'close', k, done: true, accs, exp });
+  },
   'close-save': () => saveClose(),
   'close-undo': el => { const k = el.dataset.k, d = ensureMonth(k); delete d.closed; saveMonth(k); render(); toast(cap(mName(k)) + ' reabierto. Los saldos se quedan como están.'); },
   'split-reset': el => { const k = el.dataset.k, d = ensureMonth(k); if (d.sweep) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; } saveMonth(k); render(); },

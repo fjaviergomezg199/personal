@@ -1,5 +1,5 @@
 /* Service worker de Cuentas Claras: la app abre sin conexión y se actualiza sola cuando hay red. */
-const VERSION = '202610291831';
+const VERSION = '202610291842';
 const CACHE = 'cuentas-' + VERSION;
 const FONTS = 'cuentas-fuentes';
 const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];

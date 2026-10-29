@@ -140,7 +140,7 @@ Con Google conectado, en *Ajustes → Copia de seguridad* activa **«Copia autom
 
 ## Cuentas Claras (finanzas)
 
-En el mismo sitio vive una segunda app, independiente de Día a Día: **Cuentas Claras**, para ingresos, gastos, fijos, ahorro y la previsión mes a mes. Se abre en `https://fjaviergomezg199.github.io/personal/cuentas/` y se instala igual (Safari → Compartir → Añadir a pantalla de inicio).
+En el mismo sitio vive una segunda app, independiente de Día a Día: **Cuentas Claras**, para ingresos, gastos, fijos, ahorro y la previsión mes a mes. El nombre se cambia en *Cuentas → Tus datos* (o tocando el de arriba). Se abre en `https://fjaviergomezg199.github.io/personal/cuentas/` y se instala igual (Safari → Compartir → Añadir a pantalla de inicio).
 
 - Los datos se guardan **solo en el móvil**. En *Cuentas → Tus datos* se descarga una copia de seguridad (guárdala en Archivos o iCloud Drive) y con *Restaurar una copia* se recupera todo, también al cambiar de móvil. La app avisa si pasa un mes sin copia.
 - Es una sola página sin build: `public/cuentas/index.html`, con su `manifest.webmanifest`, su `sw.js` (para abrir sin conexión) y sus iconos. El service worker de Día a Día no toca esa carpeta.

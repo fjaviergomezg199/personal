@@ -78,8 +78,9 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 /* Cabecera */
 .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
 .top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px 4px; }
-.brand { font-family: var(--f-display); font-weight: 700; font-size: 21px; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
-.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; }
+.brand { font-family: var(--f-display); font-weight: 700; font-size: 21px; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; min-width: 0; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-align: left; }
+#brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; flex: none; }
 .brand-mark svg { width: 16px; height: 16px; stroke: var(--accent-ink); }
 .sync { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); display: inline-block; }
@@ -330,7 +331,7 @@ textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 
 <header class="top">
   <div class="wrap top-in">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h8"/></svg></span>Cuentas Claras</div>
+    <button class="brand" data-act="rename" title="Cambiar el nombre"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h8"/></svg></span><span id="brand-name">Cuentas Claras</span></button>
     <span class="sync loading" id="sync"><i></i><span>Abriendo…</span></span>
   </div>
   <nav class="wrap tabs" role="tablist" aria-label="Secciones" id="tabs"></nav>
@@ -344,9 +345,11 @@ textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 'use strict';
 /* Instalada desde GitHub (sin claude.ai alrededor): todo se guarda en este dispositivo. */
 const IS_APP = !(window.claude && window.claude.use);
-const APP_VERSION = '202610291842';
+const APP_VERSION = '202610291945';
 const versionText = () => { const v = APP_VERSION; return new Date(Date.UTC(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8), +v.slice(8, 10), +v.slice(10, 12))).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 const BK_KEY = 'cuentas-claras-ultima-copia';
+/* El nombre de la app lo pone cada uno en Cuentas → Tus datos: sale arriba, en el título y al añadirla a la pantalla de inicio */
+const DEFAULT_NAME = 'Cuentas Claras';
 const lastBackup = () => { try { return localStorage.getItem(BK_KEY) || ''; } catch (e) { return ''; } };
 const markBackup = () => { try { localStorage.setItem(BK_KEY, todayISO()); } catch (e) { /* sin almacenamiento */ } };
 let persistAsked = false;
@@ -694,7 +697,15 @@ window.addEventListener('hashchange', () => { route(); render(); });
 let charts = {};
 /* Mes en que empiezan las cuentas: antes de él no se muestra ni se cuenta nada */
 const startK = () => (S.config && S.config.start) || null;
+const appName = () => (S.config && S.config.name) || DEFAULT_NAME;
+function showName() {
+  const n = appName(), el = $('#brand-name');
+  if (el.textContent !== n) el.textContent = n;
+  document.title = n;
+  $('meta[name="apple-mobile-web-app-title"]').content = S.config && S.config.name ? n : 'Cuentas';
+}
 function render() {
+  showName();
   const st = startK();
   CUR = st && st > REAL_CUR ? st : REAL_CUR;
   if (st && S.month < st) S.month = st;
@@ -1070,6 +1081,8 @@ function vCuentas() {
   h += `</section><div class="grid">${goalCard().replace('card s-4', 'card s-6')}
     <section class="card s-6"><div class="card-h"><h2>Tus datos</h2></div>
       <p class="small muted" style="margin:0">${IS_APP ? `Se guardan solo en este móvil. Haz una copia de seguridad de vez en cuando y guárdala en Archivos o en iCloud Drive: si borras la app o cambias de móvil, con ella lo recuperas todo. ${lastBackup() ? 'Última copia: ' + fmtDate(lastBackup()) + '.' : 'Aún no has hecho ninguna copia.'} Versión de la app: ${versionText()}.` : S.mode === 'local' ? 'Ahora mismo se guardan solo en este navegador. Abre esta página desde claude.ai para guardarlos en tu cuenta.' : 'Se guardan en tu cuenta de Claude: los ves igual desde el iPad, el móvil o el portátil. Solo tú puedes verlos.'}</p>
+      <div class="field"><label for="f-name">Nombre de la app</label><input class="inp" id="f-name" data-setting="name" maxlength="30" autocomplete="off" enterkeyhint="done" placeholder="${DEFAULT_NAME}" value="${esc(C().name || '')}">
+        <span class="hint">El que sale arriba. El del icono del móvil se elige al añadirla a la pantalla de inicio.</span></div>
       <div class="field"><label for="f-start">Las cuentas empiezan en</label><select class="inp" id="f-start" data-setting="start"><option value="" ${!startK() ? 'selected' : ''}>Desde el principio</option>${Array.from({ length: 15 }, (_, i) => addM(REAL_CUR, i - 12)).map(k => `<option value="${k}" ${k === startK() ? 'selected' : ''}>${cap(mLong(k))}</option>`).join('')}</select>
         <span class="hint">Antes de ese mes no se muestra ni se cuenta nada: ni en el mes, ni en la previsión, ni en el histórico.</span></div>
       <div class="btns"><button class="btn" data-act="export-csv">Exportar a Excel (CSV)</button><button class="btn" data-act="copy-tsv">Copiar para pegar en Excel</button></div>
@@ -1602,6 +1615,7 @@ function toast(msg, action) {
 /* ---------- Acciones ---------- */
 const A = {
   tab: el => go(el.dataset.v),
+  rename: () => { go('cuentas'); const f = $('#f-name'); f.scrollIntoView({ block: 'center' }); f.focus(); f.select(); },
   month: el => { const n = Number(el.dataset.n); S.month = n === 0 ? CUR : addM(S.month, n); if (startK() && S.month < startK()) S.month = startK(); render(); },
   'open-month': el => openMonth(el.dataset.k),
   horizon: el => { S.horizon = Number(el.dataset.n); render(); },
@@ -1737,6 +1751,13 @@ document.addEventListener('change', e => {
     return;
   }
   const setting = e.target.dataset && e.target.dataset.setting;
+  if (setting === 'name') {
+    const v = e.target.value.trim().replace(/\s+/g, ' ').slice(0, 30);
+    if (v && v !== DEFAULT_NAME) C().name = v; else delete C().name;
+    saveConfig(); render();
+    toast(`La app se llama ahora «${appName()}».`);
+    return;
+  }
   if (setting === 'start') {
     C().start = e.target.value || null; saveConfig(); render();
     toast(C().start ? `Las cuentas empiezan en ${mLong(C().start)}.` : 'Se muestran todos los meses.');
@@ -1765,6 +1786,7 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && S.sheet) closeSheet();
   if (e.key === 'Enter' && S.sheet && e.target.id === 'f-newcat') { e.preventDefault(); A['add-cat'](); return; }
+  if (e.key === 'Enter' && e.target.id === 'f-name') { e.preventDefault(); e.target.blur(); return; }
   if (e.key === 'Enter' && S.sheet && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') {
     const save = $('#sheet-root .sh-foot .btn.primary'); if (save) { e.preventDefault(); save.click(); }
   }

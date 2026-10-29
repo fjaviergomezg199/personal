@@ -67,6 +67,7 @@ img { max-width: 100%; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
 body.locked { overflow: hidden; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+html { touch-action: manipulation; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -245,15 +246,15 @@ tr.cur td { font-weight: 600; }
 .big3 .l { font-size: 12px; color: var(--muted); }
 
 /* Botón flotante, aviso y hoja */
-.fab { position: fixed; right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 99px; padding: 0 22px 0 18px; height: 56px; font-weight: 600; font-size: 16px; box-shadow: var(--shadow); }
+.fab { position: fixed; right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px)); z-index: 30; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 99px; padding: 0 22px 0 18px; height: 56px; font-weight: 600; font-size: 16px; box-shadow: var(--shadow); }
 .fab svg { width: 20px; height: 20px; stroke: var(--accent-ink); }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 60; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); box-shadow: var(--shadow); font-size: 14px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(88px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px)); z-index: 60; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); box-shadow: var(--shadow); font-size: 14px; }
 .toast button { background: none; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 6px 10px; font-weight: 600; font-size: 13px; }
 .scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 40; }
 .sheet { position: fixed; z-index: 50; background: var(--surface); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
-  left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100vw - 32px)); max-height: calc(100% - 48px); border-radius: 18px; }
+  left: 50%; top: calc(var(--vvt, 0px) + var(--vvh, 100%) / 2); transform: translate(-50%, -50%); width: min(540px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100%) - 48px); border-radius: 18px; }
 @media (max-width: 600px) {
-  .sheet { left: 0; right: 0; top: auto; bottom: 0; transform: none; width: auto; max-height: 92%; border-radius: 18px 18px 0 0; }
+  .sheet { left: 0; right: 0; top: auto; bottom: var(--kb, 0px); transform: none; width: auto; max-height: min(92%, calc(var(--vvh, 100%) - 16px)); border-radius: 18px 18px 0 0; }
 }
 .sh-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--line); padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); }
 .sh-head h2 { font-family: var(--f-display); font-weight: 600; font-size: 19px; }
@@ -285,12 +286,12 @@ tr.cur td { font-weight: 600; }
 .mgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .mgrid .chip { padding: 6px 4px; text-align: center; }
 @media (max-width: 420px) { .mgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.chip-new input { width: 7.5em; border: 1px dashed var(--line-strong); border-radius: 99px; padding: 6px 12px; background: none; font-size: 14px; }
+.chip-new input { width: 7.5em; border: 1px dashed var(--line-strong); border-radius: 99px; padding: 6px 12px; background: none; font-size: 16px; }
 .switch { display: flex; align-items: center; gap: 10px; font-weight: 500; }
 .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
 .err { color: var(--neg); font-size: 14px; font-weight: 500; }
 .fixed-note { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--ink-2); }
-textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 13px; }
+textarea.inp { min-height: 140px; font-family: var(--f-num); font-size: 16px; }
 .loading { padding: 60px 0; text-align: center; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) {
   .sheet.enter { animation: pop .18s ease-out; }
@@ -573,6 +574,28 @@ function saveMonth(k) {
 const LS_KEY = 'cuentas-claras-v1';
 function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify({ config: S.config, months: S.months })); setSync('local'); askPersist(); } catch (e) { setSync('error'); toast('No se ha podido guardar en el móvil. Haz una copia de seguridad cuanto antes.'); } }
 function loadLocal() { try { const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (d) { S.config = d.config || null; S.months = d.months || {}; } } catch (e) { /* sin datos */ } }
+
+/* ---------- Lo fijo abajo, pegado a lo que se ve ----------
+   En el iPhone el teclado y las barras cambian la parte visible sin mover lo fijo:
+   el botón Añadir, los avisos y las hojas se colocan con estas medidas. */
+(function () {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+  let raf = 0;
+  const sync = () => {
+    raf = 0;
+    const kb = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
+    root.style.setProperty('--kb', Math.round(kb) + 'px');
+    root.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+    root.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
+  };
+  const queue = () => { if (!raf) raf = requestAnimationFrame(sync); };
+  vv.addEventListener('resize', queue);
+  vv.addEventListener('scroll', queue);
+  window.addEventListener('scroll', queue, { passive: true });
+  sync();
+})();
 
 /* ---------- Arranque ---------- */
 async function boot() {

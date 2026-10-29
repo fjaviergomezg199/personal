@@ -33,7 +33,7 @@ img { max-width: 100%; }
   --line: #dce2ea; --line-strong: #c3ccd8;
   --accent: #2346b0; --accent-ink: #ffffff; --accent-soft: #e7ecfa;
   --good: #0f7a52; --good-soft: #e3f4ec; --neg: #c42b2b; --neg-soft: #fcebea; --warn: #8f5500; --warn-soft: #fdf1dc;
-  --c-inc: #1baf7a; --c-exp: #eb6834; --c-save: #2a78d6; --c-total: #121926;
+  --c-inc: #1baf7a; --c-exp: #eb6834; --c-save: #2a78d6; --c-inv: #6250d6; --c-total: #121926;
   --scrim: rgba(18, 25, 38, .38); --shadow: 0 12px 32px rgba(18, 25, 38, .14);
   --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -47,7 +47,7 @@ img { max-width: 100%; }
     --line: #283140; --line-strong: #3a4556;
     --accent: #8aa4f6; --accent-ink: #0e131a; --accent-soft: #1e2a49;
     --good: #4cc99a; --good-soft: #15322a; --neg: #f07a7a; --neg-soft: #3a1f23; --warn: #e3a64a; --warn-soft: #3a2c15;
-    --c-inc: #199e70; --c-exp: #d95926; --c-save: #3987e5; --c-total: #e8ecf2;
+    --c-inc: #199e70; --c-exp: #d95926; --c-save: #3987e5; --c-inv: #9085e9; --c-total: #e8ecf2;
     --scrim: rgba(0, 0, 0, .58); --shadow: 0 12px 32px rgba(0, 0, 0, .45);
     color-scheme: dark;
   }
@@ -58,7 +58,7 @@ img { max-width: 100%; }
   --line: #283140; --line-strong: #3a4556;
   --accent: #8aa4f6; --accent-ink: #0e131a; --accent-soft: #1e2a49;
   --good: #4cc99a; --good-soft: #15322a; --neg: #f07a7a; --neg-soft: #3a1f23; --warn: #e3a64a; --warn-soft: #3a2c15;
-  --c-inc: #199e70; --c-exp: #d95926; --c-save: #3987e5; --c-total: #e8ecf2;
+  --c-inc: #199e70; --c-exp: #d95926; --c-save: #3987e5; --c-inv: #9085e9; --c-total: #e8ecf2;
   --scrim: rgba(0, 0, 0, .58); --shadow: 0 12px 32px rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
@@ -134,7 +134,8 @@ main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18
 .acc-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 6px 12px; font-size: 14px; color: var(--ink-2); }
 .acc-chip b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .kdot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); flex: none; }
-.k-ahorro, .k-inversion { background: var(--c-save); }
+.k-ahorro { background: var(--c-save); }
+.k-inversion { background: var(--c-inv); }
 .k-corriente { background: var(--ink-2); }
 .hero-side { text-align: right; }
 .side-num { font-size: 28px; font-weight: 600; letter-spacing: -.015em; margin-top: 4px; }
@@ -212,6 +213,25 @@ main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18
 .r-amt .r-of { display: block; font-family: var(--f-body); font-size: 12px; color: var(--muted); }
 .row.pend .r-amt { color: var(--muted); }
 .row.pend .r-name { color: var(--ink-2); }
+/* Reparto de lo que sobra entre la cuenta de ahorro y la de inversión */
+.split { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); margin-top: 8px; }
+.split-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.split-h .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.split-h .sub { font-size: 12px; color: var(--muted); }
+.split-lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.split-lab > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.split-lab .r { align-items: flex-end; text-align: right; }
+.split-lab b { font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sdot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.sdot.s1 { background: var(--c-save); } .sdot.s2 { background: var(--c-inv); }
+.split-range { -webkit-appearance: none; appearance: none; width: 100%; height: 34px; margin: 0; background: transparent; cursor: pointer; }
+.split-range::-webkit-slider-runnable-track { height: 12px; border-radius: 99px; background: linear-gradient(to right, var(--c-save) var(--p, 100%), var(--c-inv) var(--p, 100%)); }
+.split-range::-moz-range-track { height: 12px; border-radius: 99px; background: linear-gradient(to right, var(--c-save) var(--p, 100%), var(--c-inv) var(--p, 100%)); }
+.split-range::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.split-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); }
+.split-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.split-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
 .empty-row { padding: 12px 0; color: var(--muted); font-size: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .skipped { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding-top: 8px; border-top: 1px dashed var(--line); }
 
@@ -463,6 +483,17 @@ function itemsFor(k) {
   }
   return { list, skipped, sweepSkipped: on && k >= CUR && !!o.skip };
 }
+/* Las dos cuentas entre las que se reparte lo que sobra: la de ahorro (primero) y la otra, normalmente la de inversión */
+function sweepPair() {
+  if (!sweepOn()) return null;
+  const d = sweepDest(); if (!d) return null;
+  const sw = sweepCfg(), over = accById(sw.over);
+  const o = isSaving(over) && over.id !== d.id ? over : C().accounts.find(a => isSaving(a) && a.id !== d.id);
+  return o ? [d, o] : null;
+}
+/* % de lo que sobra que va a la primera cuenta: el general o el de ese mes */
+const splitDefault = () => { const v = Number(sweepCfg().split); return sweepCfg().split != null && v >= 0 && v <= 100 ? v : 100; };
+const splitFor = k => { const v = (monthDoc(k).sweep || {}).split; return v != null ? Number(v) : splitDefault(); };
 const sweepCfg = () => C().sweep || { on: true, acc: null };
 const sweepOn = () => sweepCfg().on !== false;
 function sweepDest() { const a = accById(sweepCfg().acc); return isSaving(a) ? a : firstSaving(); }
@@ -484,12 +515,13 @@ function project(n) {
   const base = (firstSaving() || {}).id || '_save';
   if (!(base in sv)) sv[base] = 0;
   const destOf = it => { const a = accById(it.acc); return isSaving(a) ? a.id : base; };
-  const over = isSaving(accById(sw.over)) ? sw.over : null;
+  const pair = sweepPair(), over = pair ? pair[1].id : null;
   const pots = () => { let aho = 0, inv = 0; for (const [id, v] of Object.entries(sv)) { if ((accById(id) || {}).kind === 'inversion') inv += v; else aho += v; } return { aho, inv, save: aho + inv }; };
   const start = { cc, ...pots() }; start.total = cc + start.save;
   const rows = [];
   for (let i = 0; i < n; i++) {
     const k = addM(CUR, i), { list } = itemsFor(k), t = totals(list), split = {};
+    let capHit = false;
     for (const it of list) {
       if (it.status === 'hecho') continue;
       if (it.type === 'ingreso') cc += it.amount;
@@ -498,15 +530,18 @@ function project(n) {
         cc -= it.amount;
         const dest = destOf(it);
         let toDest = it.amount;
-        // Lo que sobra va a su cuenta hasta el tope; lo que pase de ahí, a la cuenta de después
-        if (it.sweep && over && over !== dest && sw.cap > 0 && it.amount > 0) toDest = Math.min(it.amount, Math.max(0, sw.cap - sv[dest]));
+        // Lo que sobra se reparte según la barrita; a la de ahorro, solo hasta el tope. El resto, a la otra.
+        if (it.sweep && over && over !== dest && it.amount > 0) {
+          toDest = it.amount * splitFor(k) / 100;
+          if (sw.cap > 0 && toDest > sw.cap - sv[dest]) { toDest = Math.max(0, sw.cap - sv[dest]); capHit = true; }
+        }
         sv[dest] += toDest;
         if (it.amount - toDest > 0.005) sv[over] += it.amount - toDest;
         if (it.sweep) { if (Math.abs(toDest) > 0.005) split[dest] = toDest; if (it.amount - toDest > 0.005) split[over] = it.amount - toDest; }
       }
     }
     const p = pots();
-    rows.push({ k, t, cc, ...p, total: cc + p.save, split });
+    rows.push({ k, t, cc, ...p, total: cc + p.save, split, capHit });
   }
   return { start, rows };
 }
@@ -782,6 +817,28 @@ function rowHtml(k, it, split) {
     <button class="row-main" data-act="edit" data-k="${k}" ${ref}><span class="r-txt"><span class="r-name">${esc(it.name)}</span><span class="r-meta">${meta}</span></span><span class="r-amt t-${it.type}">${sign}${eur(it.amount)}</span></button>
   </li>`;
 }
+function splitBlock(o) {
+  const [a, b] = o.pair, p = o.pct, suf = o.perMonth ? '/mes' : '', dec = o.perMonth ? { dec: 0 } : {};
+  return `<div class="split" data-total="${o.total}" data-suffix="${suf}">
+    <div class="split-h"><span class="lbl">${o.title}</span><span class="sub">${o.sub}</span></div>
+    <div class="split-lab">
+      <div><b><span class="sdot s1"></span>${esc(a.name)}</b><span class="split-v" data-side="1">${p} % · ${o.perMonth ? '≈ ' : ''}${eur(o.a1, dec)}${suf}</span></div>
+      <div class="r"><b><span class="sdot s2"></span>${esc(b.name)}</b><span class="split-v" data-side="2">${100 - p} % · ${o.perMonth ? '≈ ' : ''}${eur(o.a2, dec)}${suf}</span></div>
+    </div>
+    <input type="range" class="split-range" min="0" max="100" step="5" value="${p}" style="--p:${p}%" data-split="${o.key}" aria-label="Reparto entre ${esc(a.name)} y ${esc(b.name)}" aria-valuetext="${p} % a ${esc(a.name)}, ${100 - p} % a ${esc(b.name)}">
+    ${o.note ? `<div class="small muted">${o.note}</div>` : ''}
+    <div class="split-foot">${o.foot}</div>
+  </div>`;
+}
+function monthSplit(k, list) {
+  const sw = list.find(x => x.sweep), pair = sweepPair();
+  if (!sw || !pair || k < CUR || sw.status === 'hecho' || !(sw.amount > 0.005)) return '';
+  const row = project(diffM(CUR, k) + 1).rows.slice(-1)[0], own = (monthDoc(k).sweep || {}).split != null;
+  return splitBlock({ key: k, pair, pct: splitFor(k), total: sw.amount, a1: row.split[pair[0].id] || 0, a2: row.split[pair[1].id] || 0,
+    title: `Reparto de lo que sobra (${eur(sw.amount)})`, sub: own ? 'solo ' + mName(k) : 'el de todos los meses',
+    note: row.capHit ? `${esc(pair[0].name)} llega a ${eur(sweepCfg().cap, { dec: 0 })}: lo que pase va a ${esc(pair[1].name)}.` : '',
+    foot: own ? `<button class="link" data-act="split-all" data-k="${k}">Usar este reparto todos los meses</button><button class="link" data-act="split-reset" data-k="${k}">Volver al de siempre (${splitDefault()} %)</button>` : 'Si la mueves, cambia solo este mes.' });
+}
 function vMes() {
   const k = S.month, { list, skipped, sweepSkipped } = itemsFor(k), t = totals(list);
   const split = k >= CUR ? project(diffM(CUR, k) + 1).rows.slice(-1)[0].split : null;
@@ -797,7 +854,7 @@ function vMes() {
     const tot = t[type], done = t[type + 'Done'];
     const subTxt = items.length ? `${eur(tot)}${k <= CUR && done !== tot ? ' · ' + (type === 'ingreso' ? 'cobrado ' : type === 'gasto' ? 'pagado ' : 'apartado ') + eur(done) : ''}` : '';
     h += `<section class="card"><div class="section-h"><h2>${TYPES[type].many}</h2><span class="sub">${subTxt}</span></div>
-      ${items.length ? `<ul class="rows">${items.map(i => rowHtml(k, i, split)).join('')}</ul>` : `<div class="empty-row">${type === 'ahorro' ? 'Nada apartado este mes.' : type === 'ingreso' ? 'Sin ingresos apuntados.' : 'Sin gastos apuntados.'}</div>`}
+      ${items.length ? `<ul class="rows">${items.map(i => rowHtml(k, i, split)).join('')}</ul>${type === 'ahorro' ? monthSplit(k, list) : ''}` : `<div class="empty-row">${type === 'ahorro' ? 'Nada apartado este mes.' : type === 'ingreso' ? 'Sin ingresos apuntados.' : 'Sin gastos apuntados.'}</div>`}
       <div><button class="btn ghost" data-act="add" data-type="${type}" data-k="${k}">+ ${type === 'ahorro' ? 'Apartar al ahorro' : 'Añadir ' + TYPES[type].one.toLowerCase()}</button></div>
       ${type === 'ahorro' && sweepSkipped ? `<div class="skipped">Este mes lo que sobra se queda en la cuenta. <button class="link" data-act="sweep-unskip" data-k="${k}">Pasarlo al ahorro</button></div>` : ''}
       ${type === 'gasto' && skipped.length ? `<div class="skipped">Quitados solo este mes: ${skipped.map(r => `<span>${esc(r.name)} <button class="link" data-act="unskip" data-k="${k}" data-rec="${r.id}">volver a poner</button></span>`).join('')}</div>` : ''}
@@ -902,8 +959,16 @@ function sweepSetting() {
   const others = savs.filter(a => a.id !== val);
   const capUI = sweepOn() && others.length ? `<div class="two"><div class="field"><label for="f-sweep-cap">Hasta tener ahí (€)</label><input class="inp" id="f-sweep-cap" data-setting="sweep-cap" inputmode="decimal" autocomplete="off" placeholder="Sin límite" value="${sw.cap > 0 ? esc(amtStr(sw.cap)) : ''}"></div>
     <div class="field"><label for="f-sweep-over">Y lo que pase de ahí, a</label><select class="inp" id="f-sweep-over" data-setting="sweep-over">${others.map(a => `<option value="${a.id}" ${a.id === sw.over ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div></div>` : '';
+  const pair = sweepPair();
+  let splitUI = '';
+  if (pair) {
+    const P = project(13), sweeps = P.rows.slice(1).map(r => sum(Object.values(r.split))).filter(v => v > 0), avg = sum(sweeps) / 12, p = splitDefault();
+    splitUI = splitBlock({ key: 'all', pair, pct: p, total: avg, a1: avg * p / 100, a2: avg * (100 - p) / 100, perMonth: true,
+      title: 'Cómo se reparte lo que sobra', sub: 'todos los meses', note: sw.cap > 0 ? `A ${esc(pair[0].name)} solo hasta tener ${eur(sw.cap, { dec: 0 })}; lo que pase, a ${esc(pair[1].name)}.` : '',
+      foot: 'Los importes son la media de los próximos 12 meses. En cada mes lo puedes cambiar desde «Al ahorro».' });
+  }
   return `<div class="field" style="border-top:1px solid var(--line);padding-top:14px"><label for="f-sweep">Lo que te sobra cada mes pasa a</label>
-    <select class="inp" id="f-sweep" data-setting="sweep">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === val ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${capUI}
+    <select class="inp" id="f-sweep" data-setting="sweep">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === val ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${capUI}${splitUI}
     <span class="hint">Es lo que queda tras los gastos y lo que ya apartas. Sale en cada mes, en «Al ahorro», y cuenta en la previsión. En un mes concreto lo puedes cambiar o dejar en la cuenta.</span></div>`;
 }
 
@@ -1207,6 +1272,7 @@ function saveItem() {
   const day = parseDay(s.day, k);
   if (s.mode === 'sweep') {
     const d = ensureMonth(k), o = {};
+    if ((d.sweep || {}).split != null) o.split = d.sweep.split;
     if (Math.abs(amount - s.auto) > 0.004) o.amount = amount;
     if (s.status === 'hecho') { o.status = 'hecho'; if (o.amount == null) { o.amount = s.auto; o.frozen = true; } }
     if (Object.keys(o).length) d.sweep = o; else delete d.sweep;
@@ -1425,7 +1491,14 @@ const A = {
   edit: el => openItem(el.dataset.k, { id: el.dataset.id, recId: el.dataset.rec, sweep: !!el.dataset.sweep }),
   toggle: el => toggleItem(el.dataset.k, el.dataset.id, el.dataset.rec, !!el.dataset.sweep),
   'sweep-skip': () => { const k = S.sheet.k; ensureMonth(k).sweep = { skip: true }; saveMonth(k); closeSheet(); render(); toast('En ' + mName(k) + ' lo que sobra se queda en la cuenta.'); },
-  'sweep-unskip': el => { const k = el.dataset.k, d = ensureMonth(k); delete d.sweep; saveMonth(k); render(); },
+  'sweep-unskip': el => { const k = el.dataset.k, d = ensureMonth(k); if (d.sweep) delete d.sweep.skip; if (d.sweep && !Object.keys(d.sweep).length) delete d.sweep; saveMonth(k); render(); },
+  'split-all': el => {
+    const v = splitFor(el.dataset.k);
+    C().sweep = Object.assign({ on: true, acc: null }, C().sweep || {}, { split: v });
+    for (const k of Object.keys(S.months)) { const d = S.months[k]; if (k >= CUR && d.sweep && d.sweep.split != null) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; saveMonth(k); } }
+    saveConfig(); render(); toast(`Desde ahora, ${v} % a ${sweepPair()[0].name} y ${100 - v} % a ${sweepPair()[1].name}.`);
+  },
+  'split-reset': el => { const k = el.dataset.k, d = ensureMonth(k); if (d.sweep) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; } saveMonth(k); render(); },
   'sweep-settings': () => { closeSheet(); go('cuentas'); },
   'mark-all': el => { const k = el.dataset.k, d = ensureMonth(k); for (const it of itemsFor(k).list) { if (it.status === 'hecho' || it.sweep) continue; if (it.fixed) d.rec[it.recId] = Object.assign(d.rec[it.recId] || {}, { status: 'hecho' }); else d.items.find(x => x.id === it.id).status = 'hecho'; } saveMonth(k); render(); },
   unskip: el => { const k = el.dataset.k, d = ensureMonth(k), o = d.rec[el.dataset.rec] || {}; delete o.skip; if (Object.keys(o).length) d.rec[el.dataset.rec] = o; else delete d.rec[el.dataset.rec]; saveMonth(k); render(); },
@@ -1481,8 +1554,15 @@ function prefillAmounts(s) {
   if (Array.from({ length: 12 }, (_, i) => s.amounts[addM(st, i)]).some(v => v != null && v !== '')) return;
   for (let i = 0; i < 12; i++) s.amounts[addM(st, i)] = s.amount || '';
 }
+function splitLabels(el) {
+  const box = el.closest('.split'), total = Number(box.dataset.total), suf = box.dataset.suffix, p = Number(el.value), dec = suf ? { dec: 0 } : {};
+  el.style.setProperty('--p', p + '%');
+  box.querySelector('[data-side="1"]').textContent = `${p} % · ${suf ? '≈ ' : ''}${eur(total * p / 100, dec)}${suf}`;
+  box.querySelector('[data-side="2"]').textContent = `${100 - p} % · ${suf ? '≈ ' : ''}${eur(total * (100 - p) / 100, dec)}${suf}`;
+}
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.dataset && el.dataset.split) { splitLabels(el); return; }
   if (S.sheet && el.dataset && el.dataset.amt) { (S.sheet.amounts ||= {})[el.dataset.amt] = el.value; return; }
   if (!S.sheet || !el.dataset || !el.dataset.f) return;
   S.sheet[el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value;
@@ -1490,6 +1570,19 @@ document.addEventListener('input', e => {
   if (el.dataset.f === 'repeat' || el.dataset.f === 'from' || el.dataset.f === 'freq') renderSheet();
 });
 document.addEventListener('change', e => {
+  const key = e.target.dataset && e.target.dataset.split;
+  if (key) {
+    const v = Number(e.target.value);
+    if (key === 'all') { C().sweep = Object.assign({ on: true, acc: null }, C().sweep || {}, { split: v }); saveConfig(); }
+    else {
+      const d = ensureMonth(key), o = d.sweep || {};
+      if (v === splitDefault()) delete o.split; else o.split = v;
+      if (Object.keys(o).length) d.sweep = o; else delete d.sweep;
+      saveMonth(key);
+    }
+    render();
+    return;
+  }
   const setting = e.target.dataset && e.target.dataset.setting;
   if (setting) {
     const v = e.target.value, sw = Object.assign({ on: true, acc: null }, C().sweep || {});

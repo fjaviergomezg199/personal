@@ -3,7 +3,7 @@ import type { EntryKind, GoogleEvent, HHMM, ID, ISODate } from '../store/types';
 
 /** Hojas globales que se pueden abrir desde cualquier pantalla. */
 export type SheetRequest =
-  | { type: 'quick'; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: EntryKind | 'birthday'; text?: string }
+  | { type: 'quick'; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: EntryKind | 'birthday'; text?: string; dictation?: number }
   | { type: 'entry'; id: ID; date?: ISODate }
   | { type: 'birthday'; id?: ID }
   | { type: 'google'; event: GoogleEvent }

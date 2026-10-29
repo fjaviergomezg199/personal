@@ -12,7 +12,7 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 |---|---|
 | **Hoy** | Tu día en una lista: lo que ya pasó en una línea, la hora de ahora y lo que viene. Lo que se quedó de otros días, en una línea con «A hoy». Debajo, los hábitos (se marcan con un toque), lo de mañana y las tareas sin fecha. |
 | **Calendario** | **Mes, Semana y Día.** En el mes, cada día con sus cosas en chips de colores (lo de varios días, como una barra); al tocar un día ves su lista debajo y, al volver a tocarlo, el día entero. La semana es una lista: los 7 días, cada uno con sus cosas una detrás de otra (con su hora solo si la tienen) y un ＋ para añadir en ese día; los días sin nada ocupan una línea. El día, igual. Se desliza a los lados para cambiar de mes, semana o día, y arriba se ven u ocultan las categorías. |
-| **＋** | Añadir escribiendo como hablas (ver abajo). En el calendario, añade en el día que estás viendo. |
+| **＋** | Añadir escribiendo o dictando como hablas (ver abajo). En el calendario, añade en el día que estás viendo. |
 | **Hábitos** | Los de hoy para marcar, cómo vas (racha, % y el historial de las últimas semanas) y crear o cambiar hábitos. |
 | **Ajustes** | Categorías, importar al calendario, cumpleaños, avisos, Google Calendar, copia de seguridad y apariencia. |
 
@@ -29,6 +29,8 @@ Pulsa **＋** y escribe; la app entiende la fecha, la hora, si se repite y de qu
 - `pagar el alquiler el día 1 de cada mes`, `en 20 minutos sacar la ropa`, `llamar al banco`…
 
 Debajo de la frase se ve cómo se va a guardar y se puede cambiar todo: tipo, categoría (o «＋ Nueva»), fecha, hora, «＋ Varios días» (desde y hasta), aviso, si se repite, lugar, enlace y notas.
+
+**Dictar:** el 🎤 junto al cuadro (o el de la barra de Hoy, que abre «Añadir» ya escuchando) escribe lo que dices mientras hablas y para solo al callarte; lo dicho va detrás de lo que ya hubiera escrito (escribe `#2sigma` y dicta el resto). Sale donde el navegador sabe dictar (Android, Safari…). En la app instalada en el iPhone, Apple puede no dejar (o parece que escucha pero no entiende nada): entonces avisa de usar el micrófono del teclado y el botón deja de salir en ese móvil hasta que se actualice.
 
 ### Categorías
 
@@ -149,5 +151,5 @@ Hecho con React + TypeScript + Vite, sin servidor. Estructura:
 - `src/screens/` — Hoy, Calendario (mes, semana y día), Hábitos, Ajustes (y apariencia), buscador, bienvenida.
 - `src/sheets/` — hojas de añadir y editar: añadir rápido, plan/tarea/recordatorio, cumpleaños, categoría, importar.
 - `src/components/` — filas de la agenda, selector de categoría, barra inferior, piezas comunes.
-- `src/lib/` — lógica: `quickParse` (frases en español y `#categoría`), `calendar` (cuadrícula del mes y días de la semana), `calendarImport` (JSON, listas y tablas → calendario), `recurrence` (lo que se repite), `colors`, `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`/`driveBackup` (copias), `habits`, `search`.
+- `src/lib/` — lógica: `quickParse` (frases en español y `#categoría`), `dictation` (dictar con el micrófono), `calendar` (cuadrícula del mes y días de la semana), `calendarImport` (JSON, listas y tablas → calendario), `recurrence` (lo que se repite), `colors`, `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`/`driveBackup` (copias), `habits`, `search`.
 - `src/store/` — datos, guardado local y `migrate` (paso de la versión anterior).

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { nextColor } from '../components/CategoryPicker';
 import { Sheet, toast } from '../components/ui';
 import { formatRelative, todayISO } from '../lib/dates';
@@ -61,6 +61,15 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
 
   const canSave = kind === 'birthday' ? validBirthday(bDraft) : draft.title.trim().length > 0;
 
+  // El cuadro crece con lo que se escribe (de 1 a 4 líneas): con el teclado abierto cada línea cuenta
+  const box = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const t = box.current;
+    if (!t) return;
+    t.style.height = 'auto';
+    t.style.height = `${Math.min(t.scrollHeight + t.offsetHeight - t.clientHeight, 132)}px`;
+  }, [text]);
+
   const save = () => {
     if (!canSave) return;
     if (kind === 'birthday') {
@@ -80,18 +89,20 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
       open
       onClose={props.onClose}
       title={props.date && props.date !== todayISO() ? `Añadir · ${formatRelative(props.date)}${props.time ? ` ${props.time}` : ''}` : 'Añadir'}
-      footer={
-        <button className="btn block" disabled={!canSave} onClick={save}>
+      // Guardar arriba (como en el Calendario del iPhone): así el teclado deja sitio para todo lo demás
+      headerExtra={
+        <button className="btn small" disabled={!canSave} onClick={save}>
           Guardar
         </button>
       }
     >
       <textarea
+        ref={box}
         autoFocus
         className="textarea"
-        style={{ minHeight: 56, fontSize: 'calc(17px * var(--fs))' }}
-        rows={2}
-        placeholder="¿Qué quieres apuntar? Ej.: mañana a las 10 dentista"
+        style={{ minHeight: 48, fontSize: 'calc(17px * var(--fs))', resize: 'none' }}
+        rows={1}
+        placeholder="¿Qué quieres apuntar?"
         value={text}
         enterKeyHint="done"
         onChange={(e) => setText(e.target.value)}
@@ -118,7 +129,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
         </div>
       ) : (
         <>
-          <div className="chips scroll mt12" style={{ marginBottom: 12 }} role="group" aria-label="Qué es">
+          <div className="chips scroll mt8" style={{ marginBottom: 10 }} role="group" aria-label="Qué es">
             {KIND_OPTIONS.map((k) => (
               <button key={k.value} type="button" className={`chip mini ${kind === k.value ? 'on' : ''}`} onClick={() => setKindOverride(k.value)}>
                 {k.emoji} {k.label}
@@ -134,7 +145,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
           ) : (
             <>
               {draft.title && (
-                <p className="small muted" style={{ margin: '0 2px 12px' }}>
+                <p className="small muted" style={{ margin: '0 2px 10px' }}>
                   Se guardará como <b style={{ color: 'var(--text)' }}>{draft.title}</b>
                 </p>
               )}

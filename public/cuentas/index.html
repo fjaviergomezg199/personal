@@ -378,7 +378,9 @@ const VIEWS = [['resumen', 'Resumen'], ['mes', 'Mes'], ['prevision', 'Previsión
 const NOW = new Date();
 const mk = (y, m) => y + '-' + String(m).padStart(2, '0');
 const pk = k => { const [y, m] = k.split('-').map(Number); return { y, m }; };
-const CUR = mk(NOW.getFullYear(), NOW.getMonth() + 1);
+const REAL_CUR = mk(NOW.getFullYear(), NOW.getMonth() + 1);
+/* El mes «de ahora» para la app: el real o, si las cuentas empiezan más tarde, el primero de las cuentas */
+let CUR = REAL_CUR;
 const TODAY = NOW.getDate();
 const addM = (k, n) => { const { y, m } = pk(k); const t = y * 12 + (m - 1) + n; return mk(Math.floor(t / 12), (t % 12) + 1); };
 const diffM = (a, b) => { const A = pk(a), B = pk(b); return (B.y * 12 + B.m) - (A.y * 12 + A.m); };
@@ -678,11 +680,16 @@ window.addEventListener('hashchange', () => { route(); render(); });
 
 /* ---------- Pintado ---------- */
 let charts = {};
+/* Mes en que empiezan las cuentas: antes de él no se muestra ni se cuenta nada */
+const startK = () => (S.config && S.config.start) || null;
 function render() {
+  const st = startK();
+  CUR = st && st > REAL_CUR ? st : REAL_CUR;
+  if (st && S.month < st) S.month = st;
   $('#tabs').innerHTML = VIEWS.map(([v, l]) => `<button class="tab" role="tab" aria-selected="${S.view === v}" data-act="tab" data-v="${v}">${l}</button>`).join('');
   const ready = S.loaded.config && S.loaded.months;
   $('#fab').hidden = !ready;
-  if (!ready) { $('#view').innerHTML = `<div class="loading">Abriendo tus cuentas…<br><span class="small">Tus datos se guardan en tu cuenta de Claude y solo los ves tú.</span></div>`; return; }
+  if (!ready) { $('#view').innerHTML = `<div class="loading">Abriendo tus cuentas…<br><span class="small">Tus datos se guardan en este móvil.</span></div>`; return; }
   charts = {};
   const v = { resumen: vResumen, mes: vMes, prevision: vPrevision, fijos: vFijos, cuentas: vCuentas }[S.view];
   $('#view').innerHTML = (S.loadError ? `<div class="notice neg">${ICON.alert}<div class="n-body"><div><b>No se han podido cargar tus datos.</b> Recarga la página antes de apuntar nada, para no perder cambios.</div></div></div>` : '') + v();
@@ -705,6 +712,7 @@ function alertsHtml(P) {
   else if (red) h += `<div class="notice neg">${ICON.alert}<div class="n-body"><div><b>Números rojos en ${mLong(red.k)}.</b> Con lo previsto, tus cuentas corrientes acabarían ese mes en ${eur(red.cc, { dec: 0 })}.</div>${fixLink(red.k)}</div></div>`;
   for (let i = 1; i <= 3; i++) {
     const k = addM(CUR, -i), t = totals(itemsFor(k).list);
+    if (startK() && k < startK()) break;
     if (i === 1 || monthDoc(k).closed) continue; // el mes anterior lo avisa «Cerrar el mes»
     if (t.pending) { h += `<div class="notice warn">${ICON.alert}<div class="n-body"><div>En <b>${mLong(k)}</b> hay ${t.pending === 1 ? '1 movimiento sin marcar' : t.pending + ' movimientos sin marcar'}. Márcalos como hechos o bórralos para que el mes cuadre.</div><div><button class="link" data-act="open-month" data-k="${k}">Abrir ${mName(k)} →</button></div></div></div>`; break; }
   }
@@ -714,6 +722,7 @@ function alertsHtml(P) {
 function sweepAutoFor(k) { const t = totals(itemsFor(k).list.filter(x => !x.sweep)); return Math.round((t.sobra - t.ahorro) * 100) / 100; }
 function closeNotice() {
   const k = addM(CUR, -1);
+  if (startK() && k < startK()) return '';
   if (!hasAnyData() || monthDoc(k).closed || !itemsFor(k).list.length) return '';
   return `<div class="notice info">${ICON.info}<div class="n-body"><div><b>Empieza ${mName(CUR)}: cierra ${mName(k)}.</b> Pon lo que tienes hoy en cada cuenta y lo que quedó pendiente se da por hecho. La previsión sigue desde ahí.</div><div><button class="btn primary" data-act="close-open" data-k="${k}">Cerrar ${mName(k)}</button></div></div></div>`;
 }
@@ -858,7 +867,7 @@ function vMes() {
   const k = S.month, { list, skipped, sweepSkipped } = itemsFor(k), t = totals(list);
   const split = k >= CUR ? project(diffM(CUR, k) + 1).rows.slice(-1)[0].split : null;
   let h = exampleBanner();
-  h += `<div class="month-nav"><div class="mn"><button class="icon-btn" data-act="month" data-n="-1" aria-label="Mes anterior">${ICON.left}</button><h1>${cap(mLong(k))}</h1><button class="icon-btn" data-act="month" data-n="1" aria-label="Mes siguiente">${ICON.right}</button></div>
+  h += `<div class="month-nav"><div class="mn"><button class="icon-btn" data-act="month" data-n="-1" aria-label="Mes anterior" ${startK() && k <= startK() ? 'disabled style="opacity:.35"' : ''}>${ICON.left}</button><h1>${cap(mLong(k))}</h1><button class="icon-btn" data-act="month" data-n="1" aria-label="Mes siguiente">${ICON.right}</button></div>
     <div class="btns">${k !== CUR ? `<button class="btn" data-act="month" data-n="0">Ir a ${mName(CUR)}</button>` : '<span class="pill now">Este mes</span>'}${k > CUR ? '<span class="pill">Previsión</span>' : ''}${monthDoc(k).closed ? `<span class="pill">Cerrado el ${fmtDate(monthDoc(k).closed.at)}</span><button class="link small" data-act="close-undo" data-k="${k}">Reabrir</button>` : k <= CUR && list.length ? `<button class="btn" data-act="close-open" data-k="${k}">Cerrar el mes</button>` : ''}</div></div>`;
   h += statsHtml(t, k);
   if (k < CUR && !monthDoc(k).closed && list.length) h += `<div class="notice warn">${ICON.alert}<div class="n-body"><div>Este mes ya pasó${t.pending ? ` y tiene ${t.pending === 1 ? '1 movimiento sin marcar' : t.pending + ' movimientos sin marcar'}` : ''}. Ciérralo: pon los saldos de hoy y lo pendiente se da por hecho.</div><div><button class="btn primary" data-act="close-open" data-k="${k}">Cerrar ${mName(k)}</button></div></div></div>`;
@@ -908,9 +917,11 @@ function vPrevision() {
     <p class="small muted" style="margin:0">Los saldos parten de lo que tienes hoy en Cuentas y suman lo pendiente: lo marcado como hecho se da por incluido en el saldo. «Al ahorro» incluye lo que sobra (o lo que falta) de cada mes, y ${inv ? '«Ahorro» más «Invertido» suben' : '«Ahorrado» sube'} o baja exactamente eso.</p></section>`;
   // Histórico
   let first = CUR;
+  const st0 = startK();
   for (const k of Object.keys(S.months)) if (k < first) first = k;
   for (const r of c.recurring) if (r.from < first) first = r.from;
   const past = [];
+  if (st0 && first < st0) first = st0;
   for (let k = addM(CUR, -1); k >= first && past.length < 24; k = addM(k, -1)) { const t = totals(itemsFor(k).list); if (t.ingreso || t.gasto || t.ahorro) past.push({ k, t }); }
   if (past.length) h += `<section class="card"><div class="card-h"><h2>Meses anteriores</h2><span class="sub">lo apuntado en cada mes</span></div><div class="tbl-wrap"><table style="min-width:520px">
     <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Sobró</th><th>Al ahorro</th></tr></thead><tbody>
@@ -1005,6 +1016,8 @@ function vCuentas() {
   h += `</section><div class="grid">${goalCard().replace('card s-4', 'card s-6')}
     <section class="card s-6"><div class="card-h"><h2>Tus datos</h2></div>
       <p class="small muted" style="margin:0">${IS_APP ? `Se guardan solo en este móvil. Haz una copia de seguridad de vez en cuando y guárdala en Archivos o en iCloud Drive: si borras la app o cambias de móvil, con ella lo recuperas todo. ${lastBackup() ? 'Última copia: ' + fmtDate(lastBackup()) + '.' : 'Aún no has hecho ninguna copia.'}` : S.mode === 'local' ? 'Ahora mismo se guardan solo en este navegador. Abre esta página desde claude.ai para guardarlos en tu cuenta.' : 'Se guardan en tu cuenta de Claude: los ves igual desde el iPad, el móvil o el portátil. Solo tú puedes verlos.'}</p>
+      <div class="field"><label for="f-start">Las cuentas empiezan en</label><select class="inp" id="f-start" data-setting="start"><option value="" ${!startK() ? 'selected' : ''}>Desde el principio</option>${Array.from({ length: 15 }, (_, i) => addM(REAL_CUR, i - 12)).map(k => `<option value="${k}" ${k === startK() ? 'selected' : ''}>${cap(mLong(k))}</option>`).join('')}</select>
+        <span class="hint">Antes de ese mes no se muestra ni se cuenta nada: ni en el mes, ni en la previsión, ni en el histórico.</span></div>
       <div class="btns"><button class="btn" data-act="export-csv">Exportar a Excel (CSV)</button><button class="btn" data-act="copy-tsv">Copiar para pegar en Excel</button></div>
       <div class="btns"><button class="btn" data-act="export-json">Descargar copia de seguridad</button><button class="btn" data-act="restore-open">Restaurar una copia</button></div>
       <div class="btns">${S.confirm === 'clear' ? `<span class="small negt" style="align-self:center">Se borran cuentas, fijos y todos los meses.</span><button class="btn danger solid" data-act="clear-all" data-sure="1">Sí, borrar todo</button><button class="btn" data-act="confirm-cancel">Cancelar</button>` : `<button class="btn danger" data-act="clear-all">Borrar todos los datos</button>`}</div>
@@ -1274,7 +1287,7 @@ function openItem(k, o = {}) {
     if (!it) return;
     return openSheet({ kind: 'item', mode: 'edit', k, id: it.id, type: it.type, amount: amtStr(it.amount), name: it.name, cat: it.cat || '', day: it.day ?? '', status: it.status, acc: it.acc || '' });
   }
-  openSheet({ kind: 'item', mode: 'new', k, type: o.type || 'gasto', amount: '', name: '', cat: '', day: k === CUR ? TODAY : '', status: k > CUR ? 'pendiente' : 'hecho', acc: '', repeat: false, freq: '1', months: [pk(k).m], amounts: {} });
+  openSheet({ kind: 'item', mode: 'new', k, type: o.type || 'gasto', amount: '', name: '', cat: '', day: k === REAL_CUR ? TODAY : '', status: k > REAL_CUR ? 'pendiente' : 'hecho', acc: '', repeat: false, freq: '1', months: [pk(k).m], amounts: {} });
 }
 function openFixed(id, type) {
   if (id) {
@@ -1458,6 +1471,7 @@ function exportRows() {
   let first = CUR, last = addM(CUR, 11);
   for (const k of Object.keys(S.months)) { if (k < first) first = k; if (k > last) last = k; }
   for (const r of c.recurring) if (r.from < first) first = r.from;
+  if (startK() && first < startK()) first = startK();
   const rows = [['Mes', 'Día', 'Tipo', 'Concepto', 'Categoría', 'Importe', 'Estado', 'Fijo']];
   for (let k = first; k <= last; k = addM(k, 1)) {
     for (const it of sortItems(itemsFor(k).list)) {
@@ -1529,7 +1543,7 @@ function toast(msg, action) {
 /* ---------- Acciones ---------- */
 const A = {
   tab: el => go(el.dataset.v),
-  month: el => { const n = Number(el.dataset.n); S.month = n === 0 ? CUR : addM(S.month, n); render(); },
+  month: el => { const n = Number(el.dataset.n); S.month = n === 0 ? CUR : addM(S.month, n); if (startK() && S.month < startK()) S.month = startK(); render(); },
   'open-month': el => openMonth(el.dataset.k),
   horizon: el => { S.horizon = Number(el.dataset.n); render(); },
   add: el => {
@@ -1641,6 +1655,11 @@ document.addEventListener('change', e => {
     return;
   }
   const setting = e.target.dataset && e.target.dataset.setting;
+  if (setting === 'start') {
+    C().start = e.target.value || null; saveConfig(); render();
+    toast(C().start ? `Las cuentas empiezan en ${mLong(C().start)}.` : 'Se muestran todos los meses.');
+    return;
+  }
   if (setting) {
     const v = e.target.value, sw = Object.assign({ on: true, acc: null }, C().sweep || {});
     if (setting === 'sweep') { if (v === 'off') sw.on = false; else { sw.on = true; sw.acc = v || null; if (sw.over === sw.acc) sw.over = null; } }

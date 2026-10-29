@@ -11,7 +11,7 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 | Pantalla | Para qué |
 |---|---|
 | **Hoy** | Tu día en una lista: lo que ya pasó en una línea, la hora de ahora y lo que viene. Lo que se quedó de otros días, en una línea con «A hoy». Debajo, los hábitos (se marcan con un toque), lo de mañana y las tareas sin fecha. |
-| **Calendario** | **Mes, Semana y Día.** En el mes, cada día con sus cosas en chips de colores; al tocar un día ves su lista debajo y, al volver a tocarlo, el día por horas. La semana y el día van por horas, con lo que se solapa en columnas y la línea de «ahora». Se desliza a los lados para cambiar de mes, semana o día, y arriba se ven u ocultan las categorías. Tocar una hora libre abre «Añadir» a esa hora. |
+| **Calendario** | **Mes, Semana y Día.** En el mes, cada día con sus cosas en chips de colores; al tocar un día ves su lista debajo y, al volver a tocarlo, el día entero. La semana es una lista: los 7 días, cada uno con sus cosas una detrás de otra (con su hora solo si la tienen) y un ＋ para añadir en ese día; los días sin nada ocupan una línea. El día, igual. Se desliza a los lados para cambiar de mes, semana o día, y arriba se ven u ocultan las categorías. |
 | **＋** | Añadir escribiendo como hablas (ver abajo). En el calendario, añade en el día que estás viendo. |
 | **Hábitos** | Los de hoy para marcar, cómo vas (racha, % y el historial de las últimas semanas) y crear o cambiar hábitos. |
 | **Ajustes** | Categorías, importar al calendario, cumpleaños, avisos, Google Calendar, copia de seguridad y apariencia. |
@@ -148,5 +148,5 @@ Hecho con React + TypeScript + Vite, sin servidor. Estructura:
 - `src/screens/` — Hoy, Calendario (mes, semana y día), Hábitos, Ajustes (y apariencia), buscador, bienvenida.
 - `src/sheets/` — hojas de añadir y editar: añadir rápido, plan/tarea/recordatorio, cumpleaños, categoría, importar.
 - `src/components/` — filas de la agenda, selector de categoría, barra inferior, piezas comunes.
-- `src/lib/` — lógica: `quickParse` (frases en español y `#categoría`), `calendar` (cuadrícula del mes, semana y colocación por horas), `calendarImport` (JSON, listas y tablas → calendario), `recurrence` (lo que se repite), `colors`, `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`/`driveBackup` (copias), `habits`, `search`.
+- `src/lib/` — lógica: `quickParse` (frases en español y `#categoría`), `calendar` (cuadrícula del mes y días de la semana), `calendarImport` (JSON, listas y tablas → calendario), `recurrence` (lo que se repite), `colors`, `google`/`sync` (Google Calendar), `notify` (avisos), `ics`, `backup`/`driveBackup` (copias), `habits`, `search`.
 - `src/store/` — datos, guardado local y `migrate` (paso de la versión anterior).

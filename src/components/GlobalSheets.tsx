@@ -2,6 +2,7 @@ import { BirthdaySheet } from '../sheets/BirthdaySheet';
 import { EntrySheet } from '../sheets/EntrySheet';
 import { GoogleEventSheet } from '../sheets/GoogleEventSheet';
 import { ImportSheet } from '../sheets/ImportSheet';
+import { MoveSheet } from '../sheets/MoveSheet';
 import { QuickAddSheet } from '../sheets/QuickAdd';
 import { closeSheet, useCurrentSheet } from './sheets';
 
@@ -13,6 +14,8 @@ export function GlobalSheets() {
       return <QuickAddSheet date={req.date} time={req.time} categoryId={req.categoryId} kind={req.kind} text={req.text} dictation={req.dictation} onClose={closeSheet} />;
     case 'entry':
       return <EntrySheet key={`${req.id}:${req.date ?? ''}`} id={req.id} date={req.date} onClose={closeSheet} />;
+    case 'move':
+      return <MoveSheet id={req.id} onClose={closeSheet} />;
     case 'birthday':
       return <BirthdaySheet key={req.id ?? 'new'} id={req.id} onClose={closeSheet} />;
     case 'google':

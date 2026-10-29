@@ -5,6 +5,7 @@ import type { EntryKind, GoogleEvent, HHMM, ID, ISODate } from '../store/types';
 export type SheetRequest =
   | { type: 'quick'; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: EntryKind | 'birthday'; text?: string; dictation?: number }
   | { type: 'entry'; id: ID; date?: ISODate }
+  | { type: 'move'; id: ID }
   | { type: 'birthday'; id?: ID }
   | { type: 'google'; event: GoogleEvent }
   | { type: 'import'; text?: string };

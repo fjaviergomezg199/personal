@@ -2,6 +2,7 @@
 const VERSION = '__VERSION__';
 const CACHE = 'diaadia-' + VERSION;
 const PRECACHE = __PRECACHE__;
+const CUENTAS = new URL('cuentas/', self.registration.scope).pathname;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -40,6 +41,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // Google, etc.: siempre a la red
+  if (url.pathname.startsWith(CUENTAS)) return; // Cuentas Claras (public/cuentas/) tiene su propio service worker
 
   if (req.mode === 'navigate') {
     // Red primero para recibir las versiones nuevas; sin conexión, la copia.

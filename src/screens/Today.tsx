@@ -9,7 +9,7 @@ import { canDictate, startDictation, useDictation } from '../lib/dictation';
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { useTick, useToday } from '../lib/useToday';
 import { agendaForDate, categoryMap, itemTitle, pendingEntries, type AgendaItem } from '../store/selectors';
-import { getState, toggleEntryDone, updateEntry, useApp } from '../store/store';
+import { toggleEntryDone, useApp } from '../store/store';
 import type { ISODate } from '../store/types';
 import { HabitsToday } from './Habits';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
@@ -207,8 +207,9 @@ function NowLine({ now }: { now: number }) {
 const PENDING_SHOWN = 3; // que «Lo de hoy» siga a la vista en un móvil pequeño
 
 /**
- * 📌 Pendientes: lo que se quedó sin hacer de otros días (con su «A hoy») y lo apuntado sin fecha, para
- * tenerlo a la vista hasta que se haga. Con la primera línea de las notas, por si es algo para leer.
+ * 📌 Pendientes: lo que se quedó sin hacer de otros días y lo apuntado sin fecha, para tenerlo a la vista
+ * hasta que se haga, y «Mover» para pasarlo a otro día de un toque. Con la primera línea de las notas, por si
+ * es algo para leer.
  */
 function Pending({ today }: { today: ISODate }) {
   const state = useApp();
@@ -241,17 +242,15 @@ function Pending({ today }: { today: ISODate }) {
                 toast(`Hecho: ${e.title}`, { action: 'Deshacer', onAction: () => toggleEntryDone(e.id) });
               }}
               trail={
-                e.date ? (
-                  <button
-                    className="chip mini"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      moveToToday([e.id], today);
-                    }}
-                  >
-                    A hoy
-                  </button>
-                ) : undefined
+                <button
+                  className="chip mini"
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    openSheet({ type: 'move', id: e.id });
+                  }}
+                >
+                  Mover
+                </button>
               }
             />
           ))}
@@ -268,18 +267,6 @@ function Pending({ today }: { today: ISODate }) {
       )}
     </div>
   );
-}
-
-/** Pasar a hoy lo que quedó de otros días (sin hora: es «para hoy»), con deshacer. */
-function moveToToday(ids: string[], today: string) {
-  const before = getState()
-    .entries.filter((e) => ids.includes(e.id))
-    .map(({ id, date, time, endTime, alert }) => ({ id, date, time, endTime, alert }));
-  for (const id of ids) updateEntry(id, { date: today, time: undefined, endTime: undefined, alert: null });
-  toast(before.length === 1 ? 'Pasado a hoy' : `${before.length} cosas pasadas a hoy`, {
-    action: 'Deshacer',
-    onAction: () => before.forEach(({ id, ...prev }) => updateEntry(id, prev)),
-  });
 }
 
 function RefreshHint() {

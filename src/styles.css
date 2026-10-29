@@ -384,10 +384,6 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .empty p { margin: 0 0 14px; font-size: calc(15px * var(--fs)); }
 
 
-/* ---------- Vista de día del calendario ---------- */
-.dayview { background: var(--bg-elev); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 12px 10px; }
-.dayview .list { box-shadow: none; border: 1px solid var(--border); }
-
 /* ---------- Días de la semana (hábitos) ---------- */
 .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .day-pill {
@@ -607,42 +603,14 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .empty-day { width: 100%; text-align: left; border: 0; color: var(--text-2); font: inherit; font-size: calc(15px * var(--fs)); cursor: pointer; }
 .empty-day b { color: var(--primary); }
 
-/* Semana y día, por horas */
-.tg-head, .tg-allday { display: grid; grid-template-columns: 38px repeat(var(--cols), minmax(0, 1fr)); }
-.tg-head { margin-bottom: 4px; }
-.tg-day { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0; color: var(--text); font: inherit; cursor: pointer; }
-.tg-day span { font-size: calc(11px * var(--fs)); font-weight: 650; color: var(--text-3); }
-.tg-day b { font-size: calc(15px * var(--fs)); min-width: 28px; height: 28px; line-height: 28px; border-radius: 99px; text-align: center; font-variant-numeric: tabular-nums; }
-.tg-day.today b { background: var(--primary); color: var(--primary-ink); }
-.tg-allday { gap: 0 2px; padding: 4px 0 6px; }
-.tg-allday-label { font-size: calc(10px * var(--fs)); color: var(--text-3); align-self: center; text-align: right; padding-right: 6px; }
-.tg-allday-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tg-allday-col .mchip { border-top: 0; border-right: 0; border-bottom: 0; text-align: left; font-family: inherit; cursor: pointer; }
-.tg-scroll {
-  height: calc(100dvh - var(--tabbar-h) - var(--safe-b) - 252px); min-height: 300px; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--bg-elev); border-radius: var(--radius); box-shadow: var(--shadow);
-}
-.tg {
-  position: relative; display: grid; grid-template-columns: 38px repeat(var(--cols), minmax(0, 1fr));
-  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hour) - 1px), var(--border) calc(var(--hour) - 1px), var(--border) var(--hour));
-}
-.tg-hours { position: relative; }
-.tg-hours span { position: absolute; right: 5px; transform: translateY(-50%); font-size: calc(10px * var(--fs)); color: var(--text-3); font-variant-numeric: tabular-nums; background: var(--bg-elev); padding: 0 1px; }
-.tg-col { position: relative; border-left: 1px solid var(--border); cursor: copy; }
-.tg-block {
-  position: absolute; border: 0; border-radius: 6px; background: var(--tone-soft, var(--primary-soft)); border-left: 3px solid var(--tone, var(--primary));
-  color: var(--text); padding: 2px 4px; text-align: left; overflow: hidden; display: flex; flex-direction: column; font: inherit; z-index: 1; cursor: pointer;
-  box-shadow: 0 0 0 1px var(--bg-elev);
-}
-.tg-title { font-size: calc(11px * var(--fs)); font-weight: 650; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; word-break: break-word; }
-.tg-time { font-size: calc(12px * var(--fs)); color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* En la semana las columnas son estrechas: mejor cortar el nombre que partirlo letra a letra */
-.tg-block.compact .tg-title { overflow-wrap: normal; word-break: normal; }
-.tg-block.narrow { padding: 2px 2px 2px 3px; }
-.tg-block.narrow .tg-title { display: block; white-space: nowrap; text-overflow: clip; }
-.tg-block.done { opacity: 0.5; }
-.tg-block.done .tg-title { text-decoration: line-through; }
-.tg-now { position: absolute; left: -4px; right: 0; height: 2px; background: var(--danger); z-index: 2; pointer-events: none; }
-.tg-now::before { content: ''; position: absolute; left: 0; top: -3px; width: 8px; height: 8px; border-radius: 99px; background: var(--danger); }
-.day-untimed { margin-bottom: 10px; }
+/* Semana y día: en lista, una cosa detrás de otra */
+.week-list { display: flex; flex-direction: column; gap: 12px; }
+.wday-head { display: flex; align-items: center; gap: 6px; margin: 0 2px 6px 4px; min-height: 34px; }
+.wday.free .wday-head { margin-bottom: 0; }
+.wday-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.wday-name b { font-size: calc(16px * var(--fs)); font-weight: 700; letter-spacing: -0.01em; }
+.wday.past .wday-name b { color: var(--text-2); }
+.wday.today .wday-name b { color: var(--primary); }
+.wday-hoy { font-size: calc(12px * var(--fs)); font-weight: 750; color: var(--primary-ink); background: var(--primary); border-radius: 99px; padding: 1px 8px; }
+.wday-free { font-size: calc(14px * var(--fs)); color: var(--text-3); }
 .import-preview .row { min-height: 48px; padding-top: 8px; padding-bottom: 8px; }

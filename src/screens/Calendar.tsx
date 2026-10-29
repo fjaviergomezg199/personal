@@ -1,13 +1,13 @@
 import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AgendaRow } from '../components/AgendaRow';
 import { openSheet } from '../components/sheets';
 import { Segmented } from '../components/ui';
-import { firstVisibleMinute, layoutDay, monthGrid, slotAt, weekDays, type Block } from '../lib/calendar';
+import { monthGrid, weekDays } from '../lib/calendar';
 import { calendarDay, setCalendarDay } from '../lib/calendarState';
 import { addDays, addMonths, capitalize, formatLong, formatShort, formatWeek, MONTHS, parseISODate, startOfWeek, WEEKDAY_LETTERS, WEEKDAYS, weekdayIndex } from '../lib/dates';
 import { navigate, useRoute } from '../lib/router';
-import { useTick, useToday } from '../lib/useToday';
+import { useToday } from '../lib/useToday';
 import { agendaForRange, itemTitle, sortedCategories, type AgendaItem } from '../store/selectors';
 import { toggleCategoryHidden, updateSettings, useApp } from '../store/store';
 import type { CalendarView, ISODate } from '../store/types';
@@ -26,12 +26,6 @@ function toneOf(i: AgendaItem): { className: string; style?: CSSProperties } {
 }
 
 const isDone = (i: AgendaItem) => i.kind === 'entry' && i.done;
-
-function open(i: AgendaItem) {
-  if (i.kind === 'entry') openSheet({ type: 'entry', id: i.entry.id, date: i.date });
-  else if (i.kind === 'google') openSheet({ type: 'google', event: i.event });
-  else openSheet({ type: 'birthday', id: i.birthday.id });
-}
 
 export function Calendar() {
   const state = useApp();
@@ -94,7 +88,7 @@ export function Calendar() {
       <div className="cal-body" {...swipe}>
         {view === 'month' && <MonthView day={day} today={today} onSelect={setDay} onOpenDay={openDay} />}
         {view === 'week' && <WeekView day={day} today={today} onOpenDay={openDay} />}
-        {view === 'day' && <DayView day={day} today={today} />}
+        {view === 'day' && <DayView day={day} />}
       </div>
     </div>
   );
@@ -172,27 +166,20 @@ function MonthView({ day, today, onSelect, onOpenDay }: { day: ISODate; today: I
           </div>
         ))}
       </div>
-      <DayList day={day} items={items} today={today} onOpenDay={onOpenDay} />
+      <DayList day={day} items={items} today={today} />
     </>
   );
 }
 
 /** Lo de un día, en lista (debajo del mes). */
-function DayList({ day, items, today, onOpenDay }: { day: ISODate; items: AgendaItem[]; today: ISODate; onOpenDay?: (d: ISODate) => void }) {
+function DayList({ day, items, today }: { day: ISODate; items: AgendaItem[]; today: ISODate }) {
   return (
     <div className="section cal-daylist">
       <div className="section-head">
         <h2>{day === today ? `Hoy · ${WEEKDAYS[weekdayIndex(day)]} ${Number(day.slice(8))}` : capitalize(formatLong(day))}</h2>
-        <div className="hstack">
-          {onOpenDay && items.length > 0 && (
-            <button className="link-btn" onClick={() => onOpenDay(day)}>
-              Por horas
-            </button>
-          )}
-          <button className="icon-btn small primary" aria-label="Añadir este día" onClick={() => openSheet({ type: 'quick', date: day })}>
-            <Plus size={18} />
-          </button>
-        </div>
+        <button className="icon-btn small primary" aria-label="Añadir este día" onClick={() => openSheet({ type: 'quick', date: day })}>
+          <Plus size={18} />
+        </button>
       </div>
       {items.length ? (
         <div className="list">
@@ -210,157 +197,65 @@ function DayList({ day, items, today, onOpenDay }: { day: ISODate; items: Agenda
 }
 
 /* ---------------------------------------------------------------- */
-/* Semana y día (por horas)                                           */
+/* Semana y día: en lista, una cosa detrás de otra                    */
 /* ---------------------------------------------------------------- */
-
-const HOUR_WEEK = 44;
-const HOUR_DAY = 56;
 
 function WeekView({ day, today, onOpenDay }: { day: ISODate; today: ISODate; onOpenDay: (d: ISODate) => void }) {
   const state = useApp();
   const days = useMemo(() => weekDays(day), [day]);
   const data = useMemo(() => agendaForRange(state, days[0], days[6], { hideHidden: true }), [state, days]);
   return (
-    <div className="week">
-      <div className="tg-head" style={{ '--cols': 7 } as CSSProperties}>
-        <span />
-        {days.map((d, i) => (
-          <button key={d} className={`tg-day ${d === today ? 'today' : ''}`} onClick={() => onOpenDay(d)} aria-label={`Ver el ${formatLong(d)}`}>
-            <span>{WEEKDAY_LETTERS[i]}</span>
-            <b>{Number(d.slice(8))}</b>
-          </button>
-        ))}
-      </div>
-      <AllDayRow days={days} data={data} />
-      <TimeGrid days={days} data={data} today={today} hourPx={HOUR_WEEK} compact />
-    </div>
-  );
-}
-
-/** Lo que no tiene hora, encima de las horas (en la semana). */
-function AllDayRow({ days, data }: { days: ISODate[]; data: Map<ISODate, AgendaItem[]> }) {
-  const lists = days.map((d) => (data.get(d) ?? []).filter((i) => !i.time));
-  if (!lists.some((l) => l.length)) return null;
-  return (
-    <div className="tg-allday" style={{ '--cols': days.length } as CSSProperties}>
-      <span className="tg-allday-label">Día</span>
-      {lists.map((list, k) => (
-        <div key={days[k]} className="tg-allday-col">
-          {list.slice(0, list.length > 2 ? 1 : 2).map((i) => {
-            const t = toneOf(i);
-            return (
-              <button key={i.key} className={`mchip ${t.className} ${isDone(i) ? 'done' : ''}`} style={t.style} onClick={() => open(i)}>
-                {i.kind === 'birthday' ? `🎂 ${i.birthday.name}` : itemTitle(i)}
+    <div className="week-list">
+      {days.map((d) => {
+        const items = data.get(d) ?? [];
+        return (
+          <section key={d} className={`wday ${d === today ? 'today' : ''} ${d < today ? 'past' : ''} ${items.length ? '' : 'free'}`}>
+            <div className="wday-head">
+              <button className="plain-btn wday-name" onClick={() => onOpenDay(d)} aria-label={`Ver el ${formatLong(d)}`}>
+                <b>
+                  {capitalize(WEEKDAYS[weekdayIndex(d)])} {Number(d.slice(8))}
+                </b>
+                {d === today && <span className="wday-hoy">Hoy</span>}
+                {!items.length && <span className="wday-free">Nada</span>}
               </button>
-            );
-          })}
-          {list.length > 2 && <span className="mmore">+{list.length - 1}</span>}
-        </div>
-      ))}
+              <button className="icon-btn small plain" aria-label={`Añadir el ${formatLong(d)}`} onClick={() => openSheet({ type: 'quick', date: d })}>
+                <Plus size={18} />
+              </button>
+            </div>
+            {items.length > 0 && (
+              <div className="list">
+                {items.map((i) => (
+                  <AgendaRow key={i.key} item={i} />
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
 
-function DayView({ day, today }: { day: ISODate; today: ISODate }) {
+function DayView({ day }: { day: ISODate }) {
   const state = useApp();
-  const data = useMemo(() => agendaForRange(state, day, day, { hideHidden: true }), [state, day]);
-  const items = data.get(day) ?? [];
-  const untimed = items.filter((i) => !i.time);
+  const items = useMemo(() => agendaForRange(state, day, day, { hideHidden: true }).get(day) ?? [], [state, day]);
+  const add = () => openSheet({ type: 'quick', date: day });
+  if (!items.length)
+    return (
+      <button className="card empty-day" onClick={add}>
+        Nada este día · <b>Añadir algo</b>
+      </button>
+    );
   return (
-    <div className="dayview">
-      {untimed.length > 0 && (
-        <div className="list day-untimed">
-          {untimed.map((i) => (
-            <AgendaRow key={i.key} item={i} />
-          ))}
-        </div>
-      )}
-      <TimeGrid days={[day]} data={data} today={today} hourPx={HOUR_DAY} />
-    </div>
-  );
-}
-
-function useNowMinutes(): number {
-  useTick(60000);
-  const n = new Date();
-  return n.getHours() * 60 + n.getMinutes();
-}
-
-function TimeGrid(props: { days: ISODate[]; data: Map<ISODate, AgendaItem[]>; today: ISODate; hourPx: number; compact?: boolean }) {
-  const { days, data, today, hourPx } = props;
-  const scroller = useRef<HTMLDivElement>(null);
-  const now = useNowMinutes();
-  const layouts = days.map((d) => layoutDay(data.get(d) ?? []));
-  const key = `${days[0]}:${days.length}`;
-  // Al abrir: que se vea lo que queda por delante y, si es hoy, la hora de ahora
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const span = (el.clientHeight / hourPx) * 60 - 20;
-    const top = firstVisibleMinute(days.map((date, k) => ({ date, blocks: layouts[k] })), today, now, span);
-    el.scrollTo({ top: Math.max(0, (top / 60) * hourPx - 12) });
-  }, [key]);
-
-  return (
-    <div className="tg-scroll" ref={scroller}>
-      <div className="tg" style={{ height: 24 * hourPx, '--cols': days.length, '--hour': `${hourPx}px` } as CSSProperties}>
-        <div className="tg-hours" aria-hidden>
-          {Array.from({ length: 23 }, (_, h) => (
-            <span key={h} style={{ top: (h + 1) * hourPx }}>
-              {String(h + 1).padStart(2, '0')}:00
-            </span>
-          ))}
-        </div>
-        {days.map((d, k) => (
-          <div
-            key={d}
-            className="tg-col"
-            onClick={(e) => {
-              if (e.target !== e.currentTarget) return;
-              const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-              openSheet({ type: 'quick', date: d, time: slotAt(y, hourPx) });
-            }}
-          >
-            {layouts[k].map((b) => (
-              <BlockView key={b.item.key} b={b} hourPx={hourPx} compact={props.compact} />
-            ))}
-            {d === today && <div className="tg-now" style={{ top: (now / 60) * hourPx }} aria-label="Ahora" />}
-          </div>
+    <>
+      <div className="list">
+        {items.map((i) => (
+          <AgendaRow key={i.key} item={i} />
         ))}
       </div>
-    </div>
-  );
-}
-
-function BlockView({ b, hourPx, compact }: { b: Block; hourPx: number; compact?: boolean }) {
-  const t = toneOf(b.item);
-  const height = Math.max(18, ((b.end - b.start) / 60) * hourPx - 2);
-  const label: ReactNode = (
-    <>
-      <span className="tg-title">{itemTitle(b.item)}</span>
-      {!compact && height > 34 && (
-        <span className="tg-time">
-          {b.item.time}
-          {b.item.kind === 'entry' && b.item.entry.endTime ? `–${b.item.entry.endTime}` : ''}
-          {b.item.kind === 'entry' && b.item.category ? ` · ${b.item.category.name}` : ''}
-        </span>
-      )}
+      <button className="btn secondary small mt12" onClick={add}>
+        <Plus size={16} /> Añadir este día
+      </button>
     </>
-  );
-  return (
-    <button
-      className={`tg-block ${t.className} ${isDone(b.item) ? 'done' : ''} ${compact ? 'compact' : ''} ${compact && b.lanes > 1 ? 'narrow' : ''}`}
-      style={{
-        ...t.style,
-        top: (b.start / 60) * hourPx + 1,
-        height,
-        left: `calc(${(b.lane / b.lanes) * 100}% + 1px)`,
-        width: `calc(${100 / b.lanes}% - 3px)`,
-      }}
-      onClick={() => open(b.item)}
-      aria-label={`${b.item.time} ${itemTitle(b.item)}`}
-    >
-      {label}
-    </button>
   );
 }

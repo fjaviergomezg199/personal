@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCategory, addEntry, deleteCategory, getState, importEntries, moveCategory, normalizeState, replaceState, restoreCategory, toggleCategoryHidden, undoImport, updateCategory } from './store';
-import { agendaForRange, overdueEntries } from './selectors';
+import { agendaForRange, overdueEntries, pendingEntries } from './selectors';
 import type { AppState } from './types';
 
 vi.mock('./db', () => ({
@@ -114,3 +114,24 @@ describe('planes de varios días', () => {
   });
 });
 
+
+describe('📌 pendientes', () => {
+  it('lo sin fecha y lo que se quedó de otros días; arriba lo importante y luego lo último', () => {
+    const at = (d: string) => `${d}T10:00:00.000Z`;
+    replaceState(
+      normalizeState({
+        settings: { name: 'Javi', onboarded: true },
+        entries: [
+          { ...base, id: 'old', title: 'Llamar a Fulanito', createdAt: at('2026-10-01'), updatedAt: now },
+          { ...base, id: 'new', title: 'Leer el contrato', notes: 'Cláusula 4', createdAt: at('2026-10-27'), updatedAt: now },
+          { ...base, id: 'star', title: 'Renovar el DNI', important: true, createdAt: at('2026-09-01'), updatedAt: now },
+          { ...base, id: 'late', kind: 'reminder', title: 'Pagar la academia', date: '2026-10-26', createdAt: at('2026-10-20'), updatedAt: now },
+          { ...base, id: 'done', title: 'Ya hecho', done: true, createdAt: now, updatedAt: now },
+          { ...base, id: 'later', title: 'Para el viernes', date: '2026-10-30', createdAt: now, updatedAt: now },
+          { ...base, id: 'plan', kind: 'event', title: 'Cena', date: '2026-10-20', createdAt: now, updatedAt: now },
+        ],
+      } as unknown as Partial<AppState>),
+    );
+    expect(pendingEntries(getState(), '2026-10-28').map((e) => e.id)).toEqual(['star', 'new', 'late', 'old']);
+  });
+});

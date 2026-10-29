@@ -165,6 +165,9 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
   // --- Cumpleaños y recordatorio explícito ---
   if (take(/\b(cumpleanos|cumple)\b(\s+de)?/)) kind = 'birthday';
   if (take(/^\s*(recuerdame|recordarme|recordar|recordatorio|acuerdate de|avisame)\b:?(\s+(que|de))?/)) kind = 'reminder';
+  // «Pendiente llamada de Fulanito», «Tengo pendiente llamar…», «Pendientes: …», «📌 …»: algo por hacer, sin
+  // día salvo que se diga (va a 📌 Pendientes). En plural solo con «:», que «pendientes» también son de las orejas.
+  if (take(/^\s*(?:📌\s*)?(?:(?:tengo\s+)?pendiente\b(?:\s+de(?=\s+[a-z]+(?:ar|er|ir)\b))?|pendientes\s*(?=[:\-–]))\s*[:\-–]?/) ?? take(/^\s*📌/)) kind = 'task';
 
   // --- Repeticiones ---
   let m: RegExpExecArray | null;

@@ -192,3 +192,24 @@ describe('planes de varios días', () => {
     expect(p('cita médico 13-11').endDate).toBeUndefined();
   });
 });
+
+describe('📌 pendientes', () => {
+  it.each([
+    ['Pendiente llamada de Fulanito', 'Llamada de Fulanito'],
+    ['pendiente: llamar a Fulanito', 'Llamar a Fulanito'],
+    ['Tengo pendiente llamar a Fulanito', 'Llamar a Fulanito'],
+    ['Pendientes: devolver el libro a Marta', 'Devolver el libro a Marta'],
+    ['pendiente de pagar la academia', 'Pagar la academia'],
+    ['📌 Leer el contrato del piso', 'Leer el contrato del piso'],
+  ])('«%s» → tarea sin día «%s»', (text, title) => {
+    const r = p(text);
+    expect(r).toMatchObject({ kind: 'task', title });
+    expect(r.date).toBeUndefined();
+  });
+  it('si se dice el día, va ese día (y sigue siendo tarea)', () => {
+    expect(p('pendiente llamar a Fulanito el lunes')).toMatchObject({ kind: 'task', title: 'Llamar a Fulanito', date: '2026-10-26' });
+  });
+  it('«pendientes» sin «:» no es la marca (también son de las orejas)', () => {
+    expect(p('Pendientes de Leyre a arreglar').title).toMatch(/^Pendientes de Leyre/);
+  });
+});

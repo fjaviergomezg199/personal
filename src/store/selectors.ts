@@ -107,6 +107,17 @@ export function undatedTasks(s: AppState): Entry[] {
   return s.entries.filter((e) => e.kind === 'task' && !e.date && !e.done);
 }
 
+/**
+ * 📌 Pendientes: lo que se quedó sin hacer de otros días y lo apuntado sin fecha, a la vista hasta que se
+ * haga. Arriba lo importante y, luego, lo último que ha quedado pendiente.
+ */
+export function pendingEntries(s: AppState, today: ISODate): Entry[] {
+  const since = (e: Entry) => (e.date ? (e.endDate ?? e.date) : e.createdAt.slice(0, 10));
+  return [...overdueEntries(s, today), ...undatedTasks(s)].sort(
+    (a, b) => Number(!!b.important) - Number(!!a.important) || since(b).localeCompare(since(a)) || b.createdAt.localeCompare(a.createdAt),
+  );
+}
+
 export interface UpcomingBirthday {
   birthday: Birthday;
   date: ISODate;

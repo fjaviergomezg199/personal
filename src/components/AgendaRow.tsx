@@ -19,11 +19,24 @@ export function CategoryBadge({ category }: { category?: Category }) {
   );
 }
 
-export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; category?: Category; showDate?: boolean; overdue?: boolean; trail?: ReactNode }) {
+export function EntryRow(props: {
+  entry: Entry;
+  date?: string;
+  done?: boolean;
+  category?: Category;
+  showDate?: boolean;
+  overdue?: boolean;
+  /** La primera línea de las notas, para leerla sin abrir. */
+  showNotes?: boolean;
+  /** Qué hacer al marcarla (si no, solo se marca). */
+  onToggle?: () => void;
+  trail?: ReactNode;
+}) {
   const { entry: e, category } = props;
   const date = props.date ?? e.date;
   const done = props.done ?? !!e.done;
   const completable = e.kind !== 'event';
+  const note = props.showNotes ? e.notes?.trim().split('\n')[0] : undefined;
   return (
     <div
       className={`row tappable ${done ? 'done' : ''} ${category ? `has-cat tone-${category.color}` : ''}`}
@@ -33,13 +46,14 @@ export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; c
       onKeyDown={(ev) => ev.key === 'Enter' && openSheet({ type: 'entry', id: e.id, date })}
     >
       <div className="lead">
-        {completable ? <Check on={done} onChange={() => toggleEntryDone(e.id, date)} /> : <span className="ev-dot" aria-hidden />}
+        {completable ? <Check on={done} onChange={props.onToggle ?? (() => toggleEntryDone(e.id, date))} /> : <span className="ev-dot" aria-hidden />}
       </div>
       <div className="body">
         <div className="title">
           {e.important && <span aria-label="Importante">⭐ </span>}
           {e.title}
         </div>
+        {note && <div className="note ellipsis">{note}</div>}
         <div className="meta">
           {props.showDate && date && (
             <span className={props.overdue ? 'badge danger' : ''} style={props.overdue ? undefined : { fontWeight: 600, color: 'var(--text)' }}>

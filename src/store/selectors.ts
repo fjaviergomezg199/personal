@@ -7,14 +7,27 @@ export type AgendaItem =
   | { kind: 'birthday'; key: string; date: ISODate; time?: undefined; birthday: Birthday; age?: number }
   | { kind: 'google'; key: string; date: ISODate; time?: HHMM; event: GoogleEvent; calendar?: GoogleCalendarInfo };
 
+/** El primer y el último día de lo que dura varios días (un viaje, un finde…); si no, null. */
+export function spanOf(i: AgendaItem): { start: ISODate; end: ISODate } | null {
+  if (i.kind === 'entry') {
+    const e = i.entry;
+    return e.repeat === 'none' && e.date && e.endDate && e.endDate > e.date ? { start: e.date, end: e.endDate } : null;
+  }
+  if (i.kind === 'google') return i.event.endDate && i.event.endDate > i.event.date ? { start: i.event.date, end: i.event.endDate } : null;
+  return null;
+}
+
+export const isMultiDay = (i: AgendaItem) => spanOf(i) !== null;
+
 function rank(i: AgendaItem): number {
+  if (isMultiDay(i)) return -1;
   if (i.kind === 'birthday') return 0;
   if (i.time) return 2;
   if (i.kind === 'google' || (i.kind === 'entry' && i.entry.kind === 'event')) return 1;
   return 3;
 }
 
-/** Primero lo de todo el día (cumpleaños, planes), luego por hora y al final las tareas sin hora. */
+/** Primero lo de varios días, luego lo de todo el día (cumpleaños, planes), por hora y al final las tareas sin hora. */
 export function sortAgenda(items: AgendaItem[]): AgendaItem[] {
   return [...items].sort((a, b) => {
     const r = rank(a) - rank(b);
@@ -85,7 +98,7 @@ export function agendaForDate(s: AppState, date: ISODate, opts: AgendaOptions = 
 export function overdueEntries(s: AppState, today: ISODate): Entry[] {
   // Lo de un plan importado (entrenos, temas…) no se arrastra: si no se hizo, se queda en su día
   return s.entries
-    .filter((e) => e.kind !== 'event' && e.repeat === 'none' && !e.done && !e.importId && e.date && e.date < today)
+    .filter((e) => e.kind !== 'event' && e.repeat === 'none' && !e.done && !e.importId && e.date && (e.endDate ?? e.date) < today)
     .sort((a, b) => (a.date! + (a.time ?? '')).localeCompare(b.date! + (b.time ?? '')));
 }
 

@@ -39,7 +39,8 @@ export function entryToGoogle(e: Entry, category?: Category): Partial<GCalEvent>
   let start: GCalEvent['start'];
   let end: GCalEvent['end'];
   if (e.time) {
-    const endTime = e.endTime && e.endTime > e.time ? e.endTime : addMinutesToTime(e.time, e.kind === 'event' ? 60 : 30);
+    const multi = !!e.endDate && e.endDate > date;
+    const endTime = e.endTime && (multi || e.endTime > e.time) ? e.endTime : addMinutesToTime(e.time, e.kind === 'event' ? 60 : 30);
     start = { dateTime: `${date}T${e.time}:00`, timeZone: tz };
     end = { dateTime: `${e.endDate && e.endDate > date ? e.endDate : date}T${endTime}:00`, timeZone: tz };
   } else {

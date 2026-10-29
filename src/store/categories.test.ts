@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCategory, addEntry, deleteCategory, getState, importEntries, moveCategory, normalizeState, replaceState, restoreCategory, toggleCategoryHidden, undoImport, updateCategory } from './store';
-import { overdueEntries } from './selectors';
+import { agendaForRange, overdueEntries } from './selectors';
 import type { AppState } from './types';
 
 vi.mock('./db', () => ({
@@ -96,3 +96,21 @@ describe('importar al calendario', () => {
     expect(overdueEntries(getState(), '2026-10-28').map((e) => e.id)).toEqual([todo]);
   });
 });
+
+describe('planes de varios días', () => {
+  it('salen todos los días, los primeros, y lo pendiente no pasa a «de otros días» hasta que acaban', () => {
+    const trip = addEntry({ ...base, kind: 'event', title: 'Finde en Jaca', date: '2026-11-13', endDate: '2026-11-15' });
+    addEntry({ ...base, kind: 'event', title: 'Cena', date: '2026-11-14' });
+    const job = addEntry({ ...base, title: 'Mudanza', date: '2026-11-13', endDate: '2026-11-15' });
+    const days = agendaForRange(getState(), '2026-11-12', '2026-11-16');
+    const ids = (d: string) => (days.get(d) ?? []).map((i) => (i.kind === 'entry' ? i.entry.title : ''));
+    expect(ids('2026-11-12')).toEqual([]);
+    expect(ids('2026-11-14')).toEqual(['Finde en Jaca', 'Mudanza', 'Cena']);
+    expect(ids('2026-11-15')).toEqual(['Finde en Jaca', 'Mudanza']);
+    expect(ids('2026-11-16')).toEqual([]);
+    expect(overdueEntries(getState(), '2026-11-14').map((e) => e.id)).toEqual([]);
+    expect(overdueEntries(getState(), '2026-11-16').map((e) => e.id)).toEqual([job]);
+    expect(trip).toBeTruthy();
+  });
+});
+

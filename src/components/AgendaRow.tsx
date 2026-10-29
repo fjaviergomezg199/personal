@@ -1,6 +1,6 @@
 import { Bell, MapPin, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { formatRelative, todayISO } from '../lib/dates';
+import { formatRelative, formatSpan, todayISO } from '../lib/dates';
 import { toggleEntryDone } from '../store/store';
 import type { AgendaItem } from '../store/selectors';
 import type { Category, Entry } from '../store/types';
@@ -45,6 +45,9 @@ export function EntryRow(props: { entry: Entry; date?: string; done?: boolean; c
             <span className={props.overdue ? 'badge danger' : ''} style={props.overdue ? undefined : { fontWeight: 600, color: 'var(--text)' }}>
               {formatRelative(date, todayISO())}
             </span>
+          )}
+          {e.date && e.endDate && e.endDate > e.date && e.repeat === 'none' && (
+            <span style={{ fontWeight: 650, color: 'var(--text)' }}>{formatSpan(e.date, e.endDate)}</span>
           )}
           {e.time && (
             <span style={{ fontWeight: 650, color: 'var(--text)' }}>
@@ -105,7 +108,9 @@ export function AgendaRow({ item, trail }: { item: AgendaItem; trail?: ReactNode
           <div className="body">
             <div className="title">{g.title}</div>
             <div className="meta">
-              {item.time ? (
+              {g.endDate && g.endDate > g.date ? (
+                <span style={{ fontWeight: 650, color: 'var(--text)' }}>{formatSpan(g.date, g.endDate)}</span>
+              ) : item.time ? (
                 <span style={{ fontWeight: 650, color: 'var(--text)' }}>
                   {item.time}
                   {g.endTime ? `–${g.endTime}` : ''}

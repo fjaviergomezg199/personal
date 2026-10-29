@@ -48,6 +48,14 @@ describe('Google y .ics', () => {
     expect(g.end).toMatchObject({ dateTime: '2026-10-21T10:30:00' });
     expect(g.reminders).toEqual({ useDefault: false, overrides: [{ method: 'popup', minutes: 15 }] });
   });
+  it('varios días: todo el día hasta el último (incluido) o de la hora del primero a la del último', () => {
+    const g = entryToGoogle({ ...base, kind: 'event', date: '2026-11-13', endDate: '2026-11-15', alert: null });
+    expect(g.start).toEqual({ date: '2026-11-13' });
+    expect(g.end).toEqual({ date: '2026-11-16' });
+    const t = entryToGoogle({ ...base, kind: 'event', date: '2026-11-13', endDate: '2026-11-15', time: '18:00', endTime: '14:00' });
+    expect(t.start).toMatchObject({ dateTime: '2026-11-13T18:00:00' });
+    expect(t.end).toMatchObject({ dateTime: '2026-11-15T14:00:00' });
+  });
   it('todo el día y hecho → sin aviso', () => {
     const g = entryToGoogle({ ...base, kind: 'task', done: true });
     expect(g.start).toEqual({ date: '2026-10-21' });

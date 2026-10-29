@@ -42,6 +42,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     kind: kind === 'birthday' ? 'reminder' : kind,
     title: parsed.title,
     date: parsed.date ?? props.date,
+    endDate: parsed.endDate,
     time,
     endTime: parsed.endTime,
     repeat: parsed.repeat,

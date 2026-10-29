@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useState } from 'react';
 import { CategoryPicker } from '../components/CategoryPicker';
-import { ALLDAY_ALERTS, formatAlert, TIMED_ALERTS } from '../lib/dates';
+import { addDays, ALLDAY_ALERTS, daysBetween, formatAlert, TIMED_ALERTS } from '../lib/dates';
 import { REPEAT_LABELS } from '../lib/recurrence';
 import { getState } from '../store/store';
 import type { ColorKey, Entry, EntryKind, Repeat } from '../store/types';
@@ -71,6 +71,25 @@ export function EntryFields(props: {
     onChange({ time, alert: fixAlert(next, d.time, defaultAlert), endTime: time ? d.endTime : undefined });
   };
 
+  // Varios días (un viaje, un finde…): «Desde» y «Hasta» en vez de la hora
+  const [multiOpen, setMultiOpen] = useState(false);
+  const multi = multiOpen || !!d.endDate;
+  const setDate = (date: string | undefined) => {
+    if (!date) return onChange({ date: undefined, endDate: undefined });
+    // Al mover el primer día, el plan entero se mueve con él
+    onChange(d.date && d.endDate ? { date, endDate: addDays(date, daysBetween(d.date, d.endDate)) } : { date });
+  };
+  const toggleMulti = () => {
+    if (multi) {
+      setMultiOpen(false);
+      return onChange({ endDate: undefined });
+    }
+    setMultiOpen(true);
+    if (!d.date) return;
+    const next = { ...d, time: undefined };
+    onChange({ endDate: addDays(d.date, 1), time: undefined, endTime: undefined, repeat: 'none', alert: fixAlert(next, d.time, defaultAlert) });
+  };
+
   return (
     <div>
       {props.showKind !== false && (
@@ -101,41 +120,66 @@ export function EntryFields(props: {
 
       <div className="two mt12">
         <div className="field">
-          <label htmlFor="ef-date">{d.kind === 'task' ? 'Fecha (opcional)' : 'Fecha'}</label>
+          <label htmlFor="ef-date">{multi ? 'Desde' : d.kind === 'task' ? 'Fecha (opcional)' : 'Fecha'}</label>
           <div className="hstack">
+            <input id="ef-date" className="input" type="date" value={d.date ?? ''} onChange={(e) => setDate(e.target.value || undefined)} />
+            {d.date && d.kind === 'task' && !multi && (
+              <button type="button" className="icon-btn small plain" aria-label="Quitar fecha" onClick={() => onChange({ date: undefined, endDate: undefined, time: undefined, repeat: 'none' })}>
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+        {multi ? (
+          <div className="field">
+            <label htmlFor="ef-enddate">Hasta</label>
             <input
-              id="ef-date"
+              id="ef-enddate"
               className="input"
               type="date"
-              value={d.date ?? ''}
-              onChange={(e) => onChange({ date: e.target.value || undefined })}
+              min={d.date}
+              value={d.endDate ?? ''}
+              onChange={(e) => onChange({ endDate: e.target.value && d.date && e.target.value > d.date ? e.target.value : undefined })}
             />
-            {d.date && d.kind === 'task' && (
-              <button type="button" className="icon-btn small plain" aria-label="Quitar fecha" onClick={() => onChange({ date: undefined, time: undefined, repeat: 'none' })}>
-                <X size={16} />
-              </button>
-            )}
           </div>
-        </div>
-        <div className="field">
-          <label htmlFor="ef-time">Hora (opcional)</label>
-          <div className="hstack">
-            <input
-              id="ef-time"
-              className="input"
-              type="time"
-              value={d.time ?? ''}
-              disabled={!d.date}
-              onChange={(e) => setTime(e.target.value || undefined)}
-            />
-            {d.time && (
-              <button type="button" className="icon-btn small plain" aria-label="Quitar hora" onClick={() => setTime(undefined)}>
-                <X size={16} />
-              </button>
-            )}
+        ) : (
+          <div className="field">
+            <label htmlFor="ef-time">Hora (opcional)</label>
+            <div className="hstack">
+              <input
+                id="ef-time"
+                className="input"
+                type="time"
+                value={d.time ?? ''}
+                disabled={!d.date}
+                onChange={(e) => setTime(e.target.value || undefined)}
+              />
+              {d.time && (
+                <button type="button" className="icon-btn small plain" aria-label="Quitar hora" onClick={() => setTime(undefined)}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+      {d.date && (
+        <button type="button" className="link-btn mt8" onClick={toggleMulti} aria-pressed={multi}>
+          {multi ? 'Un solo día' : '＋ Varios días'}
+        </button>
+      )}
+      {multi && d.time && (
+        <div className="two mt12">
+          <div className="field">
+            <label htmlFor="ef-time2">Hora del primer día</label>
+            <input id="ef-time2" className="input" type="time" value={d.time} onChange={(e) => setTime(e.target.value || undefined)} />
+          </div>
+          <div className="field">
+            <label htmlFor="ef-end2">Hasta las (el último)</label>
+            <input id="ef-end2" className="input" type="time" value={d.endTime ?? ''} onChange={(e) => onChange({ endTime: e.target.value || undefined })} />
+          </div>
+        </div>
+      )}
 
       {d.date && (
         <div className="two mt12">
@@ -155,19 +199,21 @@ export function EntryFields(props: {
               ))}
             </select>
           </div>
-          <div className="field">
-            <label htmlFor="ef-repeat">Repetir</label>
-            <select id="ef-repeat" className="select" value={d.repeat} onChange={(e) => onChange({ repeat: e.target.value as Repeat })}>
-              {(Object.keys(REPEAT_LABELS) as Repeat[]).map((r) => (
-                <option key={r} value={r}>
-                  {REPEAT_LABELS[r]}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!multi && (
+            <div className="field">
+              <label htmlFor="ef-repeat">Repetir</label>
+              <select id="ef-repeat" className="select" value={d.repeat} onChange={(e) => onChange({ repeat: e.target.value as Repeat })}>
+                {(Object.keys(REPEAT_LABELS) as Repeat[]).map((r) => (
+                  <option key={r} value={r}>
+                    {REPEAT_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
-      {d.date && !d.time && d.kind !== 'task' && d.alert === null && (
+      {d.date && !d.time && !multi && d.kind !== 'task' && d.alert === null && (
         <p className="hint">Para que te avise el mismo día, ponle una hora.</p>
       )}
 
@@ -177,25 +223,15 @@ export function EntryFields(props: {
 
       {more && (
         <div className="mt12">
-          {d.kind === 'event' && d.date && (
+          {d.kind === 'event' && d.date && ((d.time && !multi) || d.repeat !== 'none') && (
             <div className="two" style={{ marginBottom: 14 }}>
-              {d.time ? (
+              {d.time && !multi ? (
                 <div className="field">
                   <label htmlFor="ef-end">Hasta las</label>
                   <input id="ef-end" className="input" type="time" value={d.endTime ?? ''} onChange={(e) => onChange({ endTime: e.target.value || undefined })} />
                 </div>
               ) : (
-                <div className="field">
-                  <label htmlFor="ef-enddate">Hasta el día</label>
-                  <input
-                    id="ef-enddate"
-                    className="input"
-                    type="date"
-                    min={d.date}
-                    value={d.endDate ?? ''}
-                    onChange={(e) => onChange({ endDate: e.target.value || undefined })}
-                  />
-                </div>
+                <div />
               )}
               {d.repeat !== 'none' ? (
                 <div className="field">

@@ -11,7 +11,7 @@ Es una *app web instalable* (PWA): se abre desde un enlace, se añade a la panta
 | Pantalla | Para qué |
 |---|---|
 | **Hoy** | Tu día en una lista: lo que ya pasó en una línea, la hora de ahora y lo que viene. Lo que se quedó de otros días, en una línea con «A hoy». Debajo, los hábitos (se marcan con un toque), lo de mañana y las tareas sin fecha. |
-| **Calendario** | **Mes, Semana y Día.** En el mes, cada día con sus cosas en chips de colores; al tocar un día ves su lista debajo y, al volver a tocarlo, el día entero. La semana es una lista: los 7 días, cada uno con sus cosas una detrás de otra (con su hora solo si la tienen) y un ＋ para añadir en ese día; los días sin nada ocupan una línea. El día, igual. Se desliza a los lados para cambiar de mes, semana o día, y arriba se ven u ocultan las categorías. |
+| **Calendario** | **Mes, Semana y Día.** En el mes, cada día con sus cosas en chips de colores (lo de varios días, como una barra); al tocar un día ves su lista debajo y, al volver a tocarlo, el día entero. La semana es una lista: los 7 días, cada uno con sus cosas una detrás de otra (con su hora solo si la tienen) y un ＋ para añadir en ese día; los días sin nada ocupan una línea. El día, igual. Se desliza a los lados para cambiar de mes, semana o día, y arriba se ven u ocultan las categorías. |
 | **＋** | Añadir escribiendo como hablas (ver abajo). En el calendario, añade en el día que estás viendo. |
 | **Hábitos** | Los de hoy para marcar, cómo vas (racha, % y el historial de las últimas semanas) y crear o cambiar hábitos. |
 | **Ajustes** | Categorías, importar al calendario, cumpleaños, avisos, Google Calendar, copia de seguridad y apariencia. |
@@ -23,11 +23,12 @@ Pulsa **＋** y escribe; la app entiende la fecha, la hora, si se repite y de qu
 - `mañana a las 10 dentista` → plan mañana 10:00 con aviso 1 h antes
 - `#2sigma reunión el lunes a las 9` → plan en la categoría **2sigma** (si no existe, se crea al guardar, con un color libre)
 - `#running rodaje 6 km jueves 19:00` → en **Running**, de su color
+- `Finde en Jaca del 13 al 15 de noviembre` → un plan de tres días (también `13-15 nov`, `del 30 al 2 de diciembre`, `de viernes a domingo`); sale cada día y, en el mes, como una barra
 - `cumple de Marta 12/03` → cumpleaños (con el año, te dice cuántos cumple)
 - `todos los lunes 9:00 clase de inglés` → se repite cada semana
 - `pagar el alquiler el día 1 de cada mes`, `en 20 minutos sacar la ropa`, `llamar al banco`…
 
-Debajo de la frase se ve cómo se va a guardar y se puede cambiar todo: tipo, categoría (o «＋ Nueva»), fecha, hora, aviso, si se repite, lugar, enlace y notas.
+Debajo de la frase se ve cómo se va a guardar y se puede cambiar todo: tipo, categoría (o «＋ Nueva»), fecha, hora, «＋ Varios días» (desde y hasta), aviso, si se repite, lugar, enlace y notas.
 
 ### Categorías
 

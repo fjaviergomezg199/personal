@@ -10,6 +10,8 @@ export interface QuickResult {
   kind: EntryKind | 'birthday';
   title: string;
   date?: ISODate;
+  /** Último día de un plan de varios días («del 13 al 15 de noviembre»). */
+  endDate?: ISODate;
   time?: HHMM;
   endTime?: HHMM;
   repeat: Repeat;
@@ -43,6 +45,7 @@ export function fold(s: string): string {
 }
 
 const WD = '(lunes|martes|miercoles|jueves|viernes|sabado|domingo)';
+const WDX = '(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)';
 const MONTH_RE =
   '(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|ene|feb|mar|abr|may|jun|jul|ago|sept|sep|oct|nov|dic)';
 const MONTH_INDEX: Record<string, number> = {
@@ -124,6 +127,7 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
   };
 
   let date: ISODate | undefined;
+  let endDate: ISODate | undefined;
   let time: HHMM | undefined;
   let endTime: HHMM | undefined;
   let repeat: Repeat = 'none';
@@ -202,6 +206,53 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
     else date = addMonths(today, n * 12);
   }
 
+  // --- Varios días: «del 13 al 15 de noviembre», «13-15 nov», «del 30 al 2 de diciembre», «del viernes al domingo» ---
+  const span = (start: ISODate | null | undefined, end: ISODate | null | undefined) => {
+    if (!start) return;
+    date = start;
+    if (end && end > start) endDate = end;
+  };
+  /** El mes anterior a `iso` con el día `day` (para «del 30 al 2 de diciembre»). */
+  const dayBefore = (iso: ISODate, day: number) => {
+    const [y, mo] = iso.split('-').map(Number);
+    return mo === 1 ? makeISODate(y - 1, 12, day) : makeISODate(y, mo - 1, day);
+  };
+  const sameMonth = (iso: ISODate, day: number) => {
+    const [y, mo] = iso.split('-').map(Number);
+    return makeISODate(y, mo, day);
+  };
+  if (!date && (m = take(new RegExp(`\\b(?:del? |desde el )?(?:${WDX} )?(?:dia )?(\\d{1,2})(?: de)? ${MONTH_RE}\\.? ?(?:-|–|al?\\b|hasta el\\b) ?(?:${WDX} )?(?:dia )?(\\d{1,2})(?: de)? ${MONTH_RE}\\b\\.?(?:(?: de| del)? (\\d{4}))?`)))) {
+    // «del 30 de noviembre al 2 de diciembre»
+    const end = withYear(Number(m[3]), MONTH_INDEX[m[4]], m[5] ? Number(m[5]) : undefined);
+    if (end) {
+      const sm = MONTH_INDEX[m[2]];
+      const ey = Number(end.slice(0, 4));
+      span(makeISODate(sm > MONTH_INDEX[m[4]] ? ey - 1 : ey, sm, Number(m[1])), end);
+    }
+  } else if (!date && (m = take(new RegExp(`\\b(?:del? |desde el |entre el )?(?:${WDX} )?(?:dia )?(\\d{1,2}) ?(?:-|–|al?\\b|hasta el\\b|y el\\b) ?(?:${WDX} )?(?:dia )?(\\d{1,2})(?: de)? ${MONTH_RE}\\b\\.?(?:(?: de| del)? (\\d{4}))?`)))) {
+    // «del 13 al 15 de noviembre», «13-15 nov»: el mes es el del último día
+    const d1 = Number(m[1]);
+    const d2 = Number(m[2]);
+    const end = withYear(d2, MONTH_INDEX[m[3]], m[4] ? Number(m[4]) : undefined);
+    if (end) span(d1 <= d2 ? sameMonth(end, d1) : dayBefore(end, d1), end);
+  } else if (!date && (m = take(/\b(?:del? |desde el )?(\d{1,2})\/(\d{1,2}) ?(?:-|–|al?\b|hasta el\b) ?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/))) {
+    // «del 13/11 al 15/11»
+    const end = withYear(Number(m[3]), Number(m[4]), m[5] ? Number(m[5]) : undefined);
+    if (end) {
+      const ey = Number(end.slice(0, 4));
+      span(makeISODate(Number(m[2]) > Number(m[4]) ? ey - 1 : ey, Number(m[2]), Number(m[1])), end);
+    }
+  } else if (!date && (m = take(new RegExp(`\\b(?:del|desde el) (?:${WDX} )?(\\d{1,2}) (?:al|hasta el) (?:${WDX} )?(\\d{1,2})\\b(?![:.,]\\d|\\s*(?:h\\b|horas))`)))) {
+    // «del 13 al 15» (sin mes): los próximos
+    const start = nextDayOfMonth(Number(m[1]));
+    const d2 = Number(m[2]);
+    if (start) span(start, d2 >= Number(m[1]) ? sameMonth(start, d2) : sameMonth(addMonths(start.slice(0, 8) + '01', 1), d2));
+  } else if (!date && (m = take(new RegExp(`\\b(?:del?|desde el) ${WD} (?:al?|hasta el) ${WD}\\b`)))) {
+    // «del viernes al domingo», «de viernes a domingo»
+    const start = nextWeekday(WEEKDAY_INDEX[m[1]], true);
+    span(start, addDays(start, (WEEKDAY_INDEX[m[2]] - WEEKDAY_INDEX[m[1]] + 7) % 7 || 7));
+  }
+
   // --- Fechas absolutas ---
   if (!date && (m = take(/\b(\d{4})-(\d{2})-(\d{2})\b/))) {
     date = makeISODate(Number(m[1]), Number(m[2]), Number(m[3])) ?? undefined;
@@ -271,9 +322,13 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
   if (!date && take(/\bmanana\b/)) date = addDays(today, 1);
   if (!date && take(/\bhoy\b/)) date = today;
   if (!date && take(/\b(?:la semana que viene|la proxima semana|la semana proxima)\b/)) date = nextWeekday(0, false);
-  if (!date && take(/\b(?:este |el )?(?:fin de semana|finde)\b/)) {
+  if (!date && (m = /\b(este |el )?(fin de semana|finde)\b/.exec(f))) {
     const wd = weekdayIndex(today);
     date = wd >= 5 ? today : nextWeekday(5, false);
+    if (m.index === f.search(/\S/) && !m[1]) {
+      // «Finde en Jaca»: el plan es el fin de semana entero y se sigue llamando así
+      if (wd < 6) endDate = addDays(date, 1);
+    } else blank(m.index, m.index + m[0].length);
   }
   if (!date && (m = take(new RegExp(`\\b(el proximo |el |este |proximo )?${WD}( que viene| proximo)?\\b`)))) {
     const wd = WEEKDAY_INDEX[m[2]];
@@ -325,7 +380,8 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
   }
 
   if (!kind) {
-    if (categoryKind === 'event') kind = 'event';
+    if (endDate) kind = TASK_VERBS.test(ft) ? 'task' : 'event';
+    else if (categoryKind === 'event') kind = 'event';
     else if (categoryKind === 'reminder' && category === 'tickets') kind = 'reminder';
     else if (date || time) kind = 'reminder';
     else if (TASK_VERBS.test(ft) || categoryKind === 'task' || categoryKind === 'reminder') kind = 'task';
@@ -343,6 +399,7 @@ export function parseQuick(input: string, now: Date = new Date()): QuickResult {
     kind,
     title,
     date,
+    ...(endDate && date && endDate > date ? { endDate } : {}),
     time,
     endTime,
     repeat,

@@ -1,10 +1,11 @@
-import { CalendarDays, Plus, RefreshCw, Search } from 'lucide-react';
+import { CalendarDays, Mic, Plus, RefreshCw, Search } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { AgendaRow, EntryRow } from '../components/AgendaRow';
 import { openSheet } from '../components/sheets';
 import { Empty, SectionHead, toast } from '../components/ui';
 import { toMinutes } from '../lib/calendar';
 import { addDays, capitalize, formatLong, formatRelative, greeting, toISODate } from '../lib/dates';
+import { canDictate, startDictation, useDictation } from '../lib/dictation';
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { useTick, useToday } from '../lib/useToday';
 import { agendaForDate, categoryMap, itemTitle, overdueEntries, undatedTasks, type AgendaItem } from '../store/selectors';
@@ -19,6 +20,7 @@ export function Today() {
   const route = useRoute();
   const [showOverdue, setShowOverdue] = useState(false);
   const [showUndated, setShowUndated] = useState(false);
+  useDictation(); // para quitar el micrófono si el móvil no deja dictar
 
   // Enlaces directos: #/hoy?ver=<id> (desde un aviso), ?nuevo=1, ?accion=buscar|importar (atajos del icono)
   const ver = route.query.get('ver');
@@ -66,10 +68,22 @@ export function Today() {
         </div>
       </div>
 
-      <button className="quick-bar" onClick={() => openSheet({ type: 'quick' })}>
-        <Plus size={20} color="var(--primary)" />
-        <span className="ph">Añade algo… «#trabajo reunión mañana a las 10»</span>
-      </button>
+      <div className="quick-bar">
+        <button className="quick-main" onClick={() => openSheet({ type: 'quick' })}>
+          <Plus size={20} color="var(--primary)" />
+          <span className="ph">Añade algo…</span>
+        </button>
+        {canDictate() && (
+          <button
+            className="mic-btn"
+            aria-label="Dictar"
+            // Se empieza a escuchar ya, en el toque (el navegador lo exige), y se abre «Añadir»
+            onClick={() => openSheet({ type: 'quick', dictation: startDictation() })}
+          >
+            <Mic size={20} />
+          </button>
+        )}
+      </div>
       <GoogleBanner />
 
       {overdue.length > 0 && (

@@ -1,25 +1,27 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Mic } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { nextColor } from '../components/CategoryPicker';
 import { Sheet, toast } from '../components/ui';
 import { formatRelative, todayISO } from '../lib/dates';
+import { canDictate, cancelDictation, DICTATION_HELP, startDictation, stopDictation, useDictation } from '../lib/dictation';
 import { parseQuick, splitHashtag } from '../lib/quickParse';
 import { addBirthday, addCategory, addEntry, deleteBirthday, deleteEntry, findCategory, useApp } from '../store/store';
 import type { EntryKind, HHMM, ID, ISODate } from '../store/types';
 import { BirthdayFields, validBirthday, type BirthdayDraft } from './BirthdayFields';
 import { EntryFields, KIND_OPTIONS, type EntryDraft } from './EntryForm';
 
-const EXAMPLES = [
-  'mañana a las 10 dentista',
-  '#2sigma reunión el lunes a las 9',
-  '#running rodaje 6 km jueves 19:00',
-  'cumple de Marta 12/03',
-  'todos los lunes 9:00 clase de inglés',
-  'llamar al banco',
-];
-
 type Kind = EntryKind | 'birthday';
 
-export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time?: HHMM; categoryId?: ID; kind?: Kind; text?: string }) {
+export function QuickAddSheet(props: {
+  onClose: () => void;
+  date?: ISODate;
+  time?: HHMM;
+  categoryId?: ID;
+  kind?: Kind;
+  text?: string;
+  /** Se abre ya escuchando: la vez que empezó el micrófono de Hoy. */
+  dictation?: number;
+}) {
   const state = useApp();
   const [text, setText] = useState(props.text ?? '');
   // Lo que se toca a mano manda; la fecha/hora con la que se abrió es solo el valor por defecto.
@@ -42,6 +44,7 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     kind: kind === 'birthday' ? 'reminder' : kind,
     title: parsed.title,
     date: parsed.date ?? props.date,
+    endDate: parsed.endDate,
     time,
     endTime: parsed.endTime,
     repeat: parsed.repeat,
@@ -70,6 +73,29 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
     t.style.height = `${Math.min(t.scrollHeight + t.offsetHeight - t.clientHeight, 132)}px`;
   }, [text]);
 
+  // Dictar: lo que se dice se va escribiendo detrás de lo que ya hubiera
+  const dict = useDictation();
+  const mine = useRef(props.dictation);
+  const before = useRef(props.text?.trim() ?? '');
+  const listening = dict.listening && dict.session === mine.current;
+  useEffect(() => {
+    if (dict.session !== mine.current || !dict.text) return;
+    setText(before.current ? `${before.current} ${dict.text}` : dict.text);
+  }, [dict.session, dict.text]);
+  useEffect(() => {
+    if (dict.session !== mine.current || !dict.error) return;
+    toast(DICTATION_HELP[dict.error], { duration: 6000 });
+    if (dict.error !== 'silence') box.current?.focus();
+  }, [dict.session, dict.error]);
+  useEffect(() => () => cancelDictation(), []);
+
+  const toggleMic = () => {
+    if (listening) return stopDictation();
+    before.current = text.trim();
+    mine.current = startDictation();
+    box.current?.blur(); // sin teclado se ve todo lo que se va entendiendo (si falla, el aviso lo vuelve a abrir)
+  };
+
   const save = () => {
     if (!canSave) return;
     if (kind === 'birthday') {
@@ -96,37 +122,36 @@ export function QuickAddSheet(props: { onClose: () => void; date?: ISODate; time
         </button>
       }
     >
-      <textarea
-        ref={box}
-        autoFocus
-        className="textarea"
-        style={{ minHeight: 48, fontSize: 'calc(17px * var(--fs))', resize: 'none' }}
-        rows={1}
-        placeholder="¿Qué quieres apuntar?"
-        value={text}
-        enterKeyHint="done"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            save();
-          }
-        }}
-      />
+      <div className="quick-input">
+        <textarea
+          ref={box}
+          autoFocus={props.dictation === undefined}
+          className="textarea"
+          style={{ minHeight: 48, fontSize: 'calc(17px * var(--fs))', resize: 'none' }}
+          rows={1}
+          placeholder={listening ? 'Te escucho…' : '¿Qué quieres apuntar?'}
+          value={text}
+          enterKeyHint="done"
+          onChange={(e) => {
+            if (listening) cancelDictation(); // si se escribe a mano, manda lo escrito
+            setText(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              save();
+            }
+          }}
+        />
+        {(listening || canDictate()) && (
+          <button type="button" className={`mic-btn ${listening ? 'on' : ''}`} aria-label={listening ? 'Parar de dictar' : 'Dictar'} aria-pressed={listening} onClick={toggleMic}>
+            <Mic size={22} />
+          </button>
+        )}
+      </div>
 
       {!text.trim() && !props.text ? (
-        <div className="mt12">
-          <div className="label" style={{ marginBottom: 6 }}>
-            Escribe como hablas. Con «#» eliges la categoría:
-          </div>
-          <div className="examples">
-            {EXAMPLES.map((ex) => (
-              <button key={ex} type="button" onClick={() => setText(ex)}>
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="hint mt8">Por ejemplo: «#2sigma reunión mañana a las 10»</p>
       ) : (
         <>
           <div className="chips scroll mt8" style={{ marginBottom: 10 }} role="group" aria-label="Qué es">

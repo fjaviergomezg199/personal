@@ -159,3 +159,36 @@ describe('«#categoría» al escribir', () => {
     expect(splitHashtag('#trabajo #casa revisar')).toEqual({ tag: 'trabajo', rest: '#casa revisar' });
   });
 });
+
+describe('planes de varios días', () => {
+  const span = (t: string) => {
+    const r = p(t);
+    return [r.title, r.kind, r.date, r.endDate];
+  };
+
+  it('«del 13 al 15 de noviembre» y sus variantes', () => {
+    expect(span('Finde en Jaca del 13 al 15 de noviembre')).toEqual(['Finde en Jaca', 'event', '2026-11-13', '2026-11-15']);
+    expect(span('finde en Jaca 13-15 nov')).toEqual(['Finde en Jaca', 'event', '2026-11-13', '2026-11-15']);
+    expect(span('Jaca del viernes 13 al domingo 15')).toEqual(['Jaca', 'event', '2026-11-13', '2026-11-15']);
+    expect(span('Congreso del 13/11 al 15/11')).toEqual(['Congreso', 'event', '2026-11-13', '2026-11-15']);
+    expect(span('entre el 13 y el 15 de noviembre feria')).toEqual(['Feria', 'event', '2026-11-13', '2026-11-15']);
+  });
+
+  it('de un mes a otro y con días de la semana', () => {
+    expect(span('Viaje del 30 al 2 de diciembre')).toEqual(['Viaje', 'event', '2026-11-30', '2026-12-02']);
+    expect(span('Puente del 30 de noviembre al 2 de diciembre')).toEqual(['Puente', 'event', '2026-11-30', '2026-12-02']);
+    expect(span('Escapada de viernes a domingo')).toEqual(['Escapada', 'event', '2026-10-23', '2026-10-25']);
+  });
+
+  it('«Finde en…» es el fin de semana entero y conserva el nombre; «este finde» es un día', () => {
+    expect(span('Finde en Jaca')).toEqual(['Finde en Jaca', 'event', '2026-10-24', '2026-10-25']);
+    expect(span('este finde cena con Ana')).toEqual(['Cena con Ana', 'event', '2026-10-24', undefined]);
+  });
+
+  it('algo que hacer durante varios días es una tarea; lo de un día sigue igual', () => {
+    expect(span('preparar la mudanza del 13 al 15 de noviembre')).toEqual(['Preparar la mudanza', 'task', '2026-11-13', '2026-11-15']);
+    expect(p('reunión el 13 de noviembre de 10 a 12')).toMatchObject({ date: '2026-11-13', time: '10:00', endTime: '12:00' });
+    expect(p('reunión el 13 de noviembre de 10 a 12').endDate).toBeUndefined();
+    expect(p('cita médico 13-11').endDate).toBeUndefined();
+  });
+});

@@ -122,6 +122,16 @@ export function formatShort(iso: ISODate): string {
   return `${WEEKDAYS_SHORT[weekdayIndex(iso)]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
 
+/** Un plan de varios días: «vie 13 – dom 15 nov», «lun 30 nov – mié 2 dic» (con el año si cambia). */
+export function formatSpan(start: ISODate, end: ISODate): string {
+  const s = parseISODate(start);
+  const e = parseISODate(end);
+  const wd = (iso: ISODate) => WEEKDAYS_SHORT[weekdayIndex(iso)];
+  if (s.getFullYear() !== e.getFullYear()) return `${wd(start)} ${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} ${s.getFullYear()} – ${wd(end)} ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]} ${e.getFullYear()}`;
+  if (s.getMonth() !== e.getMonth()) return `${wd(start)} ${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${wd(end)} ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
+  return `${wd(start)} ${s.getDate()} – ${wd(end)} ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
+}
+
 /** "21 oct" (o "21 oct 2027" si no es este año) */
 export function formatDayMonth(iso: ISODate, today: ISODate = todayISO()): string {
   const d = parseISODate(iso);

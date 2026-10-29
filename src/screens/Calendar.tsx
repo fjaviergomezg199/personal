@@ -5,10 +5,10 @@ import { openSheet } from '../components/sheets';
 import { Segmented } from '../components/ui';
 import { monthGrid, weekDays } from '../lib/calendar';
 import { calendarDay, setCalendarDay } from '../lib/calendarState';
-import { addDays, addMonths, capitalize, formatLong, formatShort, formatWeek, MONTHS, parseISODate, startOfWeek, WEEKDAY_LETTERS, WEEKDAYS, weekdayIndex } from '../lib/dates';
+import { addDays, addMonths, capitalize, daysBetween, formatLong, formatShort, formatWeek, MONTHS, parseISODate, startOfWeek, WEEKDAY_LETTERS, WEEKDAYS, weekdayIndex } from '../lib/dates';
 import { navigate, useRoute } from '../lib/router';
 import { useToday } from '../lib/useToday';
-import { agendaForRange, itemTitle, sortedCategories, type AgendaItem } from '../store/selectors';
+import { agendaForRange, itemTitle, sortedCategories, spanOf, type AgendaItem } from '../store/selectors';
 import { toggleCategoryHidden, updateSettings, useApp } from '../store/store';
 import type { CalendarView, ISODate } from '../store/types';
 
@@ -152,10 +152,24 @@ function MonthView({ day, today, onSelect, onOpenDay }: { day: ISODate; today: I
                   <span className="mnum">{n}</span>
                   {list.slice(0, list.length > MONTH_CHIPS ? MONTH_CHIPS - 1 : MONTH_CHIPS).map((i) => {
                     const t = toneOf(i);
+                    const label = i.kind === 'birthday' ? `🎂 ${i.birthday.name}` : itemTitle(i);
+                    // Varios días: una barra a lo largo de la semana, con el nombre al principio
+                    const sp = spanOf(i);
+                    const wd = weekdayIndex(d);
+                    const joinL = !!sp && sp.start < d && wd > 0;
+                    const joinR = !!sp && sp.end > d && wd < 6;
+                    const run = sp && !joinL ? Math.min(daysBetween(d, sp.end), 6 - wd) + 1 : 1;
                     return (
-                      <span key={i.key} className={`mchip ${t.className} ${isDone(i) ? 'done' : ''}`} style={t.style}>
-                        {i.kind === 'birthday' ? '🎂 ' : ''}
-                        {i.kind === 'birthday' ? i.birthday.name : itemTitle(i)}
+                      <span key={i.key} className={`mchip ${t.className} ${isDone(i) ? 'done' : ''} ${joinL ? 'join-l' : ''} ${joinR ? 'join-r' : ''}`} style={t.style}>
+                        {joinL ? (
+                          '\u00a0'
+                        ) : run > 1 ? (
+                          <span className="mchip-t" style={{ width: `calc(${run * 100}% + ${(run - 1) * 5}px)` }}>
+                            {label}
+                          </span>
+                        ) : (
+                          label
+                        )}
                       </span>
                     );
                   })}

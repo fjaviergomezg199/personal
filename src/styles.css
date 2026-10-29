@@ -351,6 +351,7 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
   position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + var(--safe-b) + 12px); z-index: 80;
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; padding: 0 16px;
 }
+.kb-open .toasts { bottom: calc(var(--kb) + 12px); } /* encima del teclado, que si no lo tapa */
 .toast {
   pointer-events: auto; background: #23221f; color: #f4f2ee; border-radius: 14px; padding: 10px 12px 10px 16px; max-width: 520px; width: 100%;
   display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-lg); font-size: calc(15px * var(--fs)); animation: toast-in 0.2s ease-out;
@@ -367,10 +368,27 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 /* ---------- Hoy ---------- */
 .hello { font-size: calc(15px * var(--fs)); color: var(--text-2); font-weight: 600; }
 .quick-bar {
-  display: flex; align-items: center; gap: 10px; background: var(--bg-elev); border-radius: 16px; box-shadow: var(--shadow);
-  padding: 0 8px 0 14px; min-height: 52px; border: 0; width: 100%; color: var(--text-3); font-size: calc(16px * var(--fs)); text-align: left;
+  display: flex; align-items: center; gap: 4px; background: var(--bg-elev); border-radius: 16px; box-shadow: var(--shadow);
+  padding-right: 6px; min-height: 52px;
 }
-.quick-bar .ph { flex: 1; }
+.quick-main {
+  flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px;
+  border: 0; border-radius: 16px; background: none; color: var(--text-3); font-size: calc(16px * var(--fs)); text-align: left;
+}
+.quick-main .ph { flex: 1; }
+/* Dictar: el botón del micrófono (rojo y latiendo mientras escucha) */
+.mic-btn {
+  flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--primary-soft); color: var(--primary);
+}
+.mic-btn.on { background: var(--danger); color: var(--bg-elev); animation: mic-pulse 1.4s ease-out infinite; }
+@keyframes mic-pulse {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); }
+  to { box-shadow: 0 0 0 12px transparent; }
+}
+.quick-input { display: flex; gap: 8px; align-items: flex-start; }
+.quick-input .textarea { flex: 1; min-width: 0; }
+.quick-input .mic-btn { width: 48px; height: 48px; }
 .banner {
   border-radius: var(--radius); padding: 14px 16px; background: var(--tone-soft, var(--primary-soft)); color: var(--text);
   display: flex; gap: 12px; align-items: center;
@@ -451,9 +469,6 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .steps { display: flex; gap: 6px; }
 .steps i { height: 5px; flex: 1; border-radius: 9px; background: var(--border); }
 .steps i.on { background: var(--primary); }
-.examples { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.examples button { text-align: left; border: 0; background: var(--bg-sunken); border-radius: 10px; padding: 9px 12px; color: var(--text-2); font-size: calc(14.5px * var(--fs)); }
-.examples button.on { background: var(--primary-soft); color: var(--text); }
 
 .callout { border-radius: 14px; padding: 12px 14px; background: var(--primary-soft); font-size: calc(14.5px * var(--fs)); line-height: 1.45; }
 .callout ol, .callout ul { margin: 6px 0 0; padding-left: 20px; }
@@ -597,6 +612,12 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
   white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
 .mchip.done { opacity: 0.5; text-decoration: line-through; }
+/* Varios días: los días seguidos se unen en una barra con el nombre a lo largo */
+.mchip.join-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: -2px; }
+.mchip.join-l { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-width: 0; margin-left: -3px; }
+/* El nombre va en el primer día y se lee a lo largo de la barra, por encima de los días siguientes */
+.mchip.join-r:not(.join-l) { overflow: visible; position: relative; z-index: 1; }
+.mchip-t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mmore { font-size: calc(10px * var(--fs)); color: var(--text-2); font-weight: 700; padding-left: 3px; }
 .tone-google { --tone: var(--g); --tone-soft: color-mix(in srgb, var(--g) 18%, var(--bg-elev)); }
 .cal-daylist { margin-top: 18px; }

@@ -193,6 +193,8 @@ img { max-width: 100%; }
 .row .body { flex: 1; min-width: 0; }
 .row .title { font-size: calc(16px * var(--fs)); font-weight: 550; line-height: 1.3; word-break: break-word; }
 .row .meta { font-size: calc(13.5px * var(--fs)); color: var(--text-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.row .meta:empty { display: none; }
+.row .note { font-size: calc(13.5px * var(--fs)); color: var(--text-2); margin-top: 2px; }
 .row .meta > span { display: inline-flex; align-items: center; gap: 4px; }
 .row .trail { flex-shrink: 0; display: flex; align-items: center; gap: 6px; color: var(--text-3); }
 .row.done .title { color: var(--text-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
@@ -566,7 +568,6 @@ input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-dat
 .gone-row .lead { color: var(--success); font-weight: 800; }
 
 /* Lo que quedó de otros días */
-.overdue-line { gap: 12px; padding: 12px 14px; }
 
 /* ---------- Categorías ---------- */
 .cat-chip i, .cat-badge i { width: 9px; height: 9px; border-radius: 99px; background: var(--tone); display: inline-block; flex-shrink: 0; }

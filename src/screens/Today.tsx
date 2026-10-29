@@ -8,8 +8,9 @@ import { addDays, capitalize, formatLong, formatRelative, greeting, toISODate } 
 import { canDictate, startDictation, useDictation } from '../lib/dictation';
 import { clearQuery, navigate, useRoute } from '../lib/router';
 import { useTick, useToday } from '../lib/useToday';
-import { agendaForDate, categoryMap, itemTitle, overdueEntries, undatedTasks, type AgendaItem } from '../store/selectors';
-import { getState, updateEntry, useApp } from '../store/store';
+import { agendaForDate, categoryMap, itemTitle, pendingEntries, type AgendaItem } from '../store/selectors';
+import { getState, toggleEntryDone, updateEntry, useApp } from '../store/store';
+import type { ISODate } from '../store/types';
 import { HabitsToday } from './Habits';
 import { GoogleBanner, GoogleStatusButton } from './GoogleStatus';
 
@@ -18,8 +19,6 @@ export function Today() {
   const state = useApp();
   const today = useToday();
   const route = useRoute();
-  const [showOverdue, setShowOverdue] = useState(false);
-  const [showUndated, setShowUndated] = useState(false);
   useDictation(); // para quitar el micrófono si el móvil no deja dictar
 
   // Enlaces directos: #/hoy?ver=<id> (desde un aviso), ?nuevo=1, ?accion=buscar|importar (atajos del icono)
@@ -43,9 +42,6 @@ export function Today() {
 
   const items = useMemo(() => agendaForDate(state, today), [state, today]);
   const tomorrow = useMemo(() => agendaForDate(state, addDays(today, 1)), [state, today]);
-  const overdue = overdueEntries(state, today);
-  const undated = undatedTasks(state);
-  const cats = categoryMap(state);
   const name = state.settings.name;
   const hasHabits = state.habits.some((h) => !h.archived);
 
@@ -86,58 +82,7 @@ export function Today() {
       </div>
       <GoogleBanner />
 
-      {overdue.length > 0 && (
-        <div className="section">
-          {showOverdue ? (
-            <>
-              <SectionHead
-                title="De otros días"
-                count={overdue.length}
-                action={
-                  <button className="link-btn" onClick={() => moveToToday(overdue.map((e) => e.id), today)}>
-                    Todo a hoy
-                  </button>
-                }
-              />
-              <div className="list">
-                {overdue.map((e) => (
-                  <EntryRow
-                    key={e.id}
-                    entry={e}
-                    category={e.categoryId ? cats.get(e.categoryId) : undefined}
-                    showDate
-                    trail={
-                      <button
-                        className="chip mini"
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          moveToToday([e.id], today);
-                        }}
-                      >
-                        A hoy
-                      </button>
-                    }
-                  />
-                ))}
-              </div>
-              <button className="link-btn mt8" onClick={() => setShowOverdue(false)}>
-                Ver menos
-              </button>
-            </>
-          ) : (
-            // Sin culpa: una línea, y a un toque pasarlo todo a hoy.
-            <div className="card hstack overdue-line">
-              <div className="grow small" role="button" tabIndex={0} onClick={() => setShowOverdue(true)} style={{ minWidth: 0, cursor: 'pointer' }}>
-                <b>{overdue.length === 1 ? 'Te quedó 1 cosa de otro día' : `Te quedaron ${overdue.length} cosas de otros días`}</b>
-                <div className="muted ellipsis">{overdue.map((e) => e.title).join(' · ')}</div>
-              </div>
-              <button className="btn small secondary" onClick={() => moveToToday(overdue.map((e) => e.id), today)}>
-                A hoy
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <Pending today={today} />
 
       <div className="section">
         <SectionHead
@@ -188,27 +133,6 @@ export function Today() {
           </p>
         )}
       </div>
-
-      {undated.length > 0 && (
-        <div className="section">
-          <SectionHead
-            title="Sin fecha"
-            count={undated.length}
-            action={
-              undated.length > 3 ? (
-                <button className="link-btn" onClick={() => setShowUndated(!showUndated)}>
-                  {showUndated ? 'Ver menos' : 'Ver todas'}
-                </button>
-              ) : undefined
-            }
-          />
-          <div className="list">
-            {(showUndated ? undated : undated.slice(0, 3)).map((e) => (
-              <EntryRow key={e.id} entry={e} category={e.categoryId ? cats.get(e.categoryId) : undefined} />
-            ))}
-          </div>
-        </div>
-      )}
 
       {!hasHabits && (
         <p className="hint center mt24">
@@ -276,6 +200,72 @@ function NowLine({ now }: { now: number }) {
       <span>
         Ahora · {String(Math.floor(now / 60)).padStart(2, '0')}:{String(now % 60).padStart(2, '0')}
       </span>
+    </div>
+  );
+}
+
+const PENDING_SHOWN = 3; // que «Lo de hoy» siga a la vista en un móvil pequeño
+
+/**
+ * 📌 Pendientes: lo que se quedó sin hacer de otros días (con su «A hoy») y lo apuntado sin fecha, para
+ * tenerlo a la vista hasta que se haga. Con la primera línea de las notas, por si es algo para leer.
+ */
+function Pending({ today }: { today: ISODate }) {
+  const state = useApp();
+  const [all, setAll] = useState(false);
+  const list = pendingEntries(state, today);
+  const cats = categoryMap(state);
+  return (
+    <div className="section">
+      <SectionHead
+        title="📌 Pendientes"
+        count={list.length || undefined}
+        action={
+          <button className="link-btn" onClick={() => openSheet({ type: 'quick', kind: 'task' })}>
+            <Plus size={16} style={{ verticalAlign: -3 }} /> Añadir
+          </button>
+        }
+      />
+      {list.length ? (
+        <div className="list">
+          {(all ? list : list.slice(0, PENDING_SHOWN)).map((e) => (
+            <EntryRow
+              key={e.id}
+              entry={e}
+              category={e.categoryId ? cats.get(e.categoryId) : undefined}
+              showDate={!!e.date}
+              showNotes
+              onToggle={() => {
+                // Se va de la lista al marcarla: por si ha sido sin querer
+                toggleEntryDone(e.id);
+                toast(`Hecho: ${e.title}`, { action: 'Deshacer', onAction: () => toggleEntryDone(e.id) });
+              }}
+              trail={
+                e.date ? (
+                  <button
+                    className="chip mini"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      moveToToday([e.id], today);
+                    }}
+                  >
+                    A hoy
+                  </button>
+                ) : undefined
+              }
+            />
+          ))}
+          {list.length > PENDING_SHOWN && (
+            <button className="row tappable more-row" onClick={() => setAll(!all)}>
+              {all ? 'Ver menos' : `Ver todas (${list.length})`}
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="hint" style={{ margin: '0 4px' }}>
+          Lo que apuntes sin día o se quede sin hacer, aquí a la vista hasta que lo hagas.
+        </p>
+      )}
     </div>
   );
 }

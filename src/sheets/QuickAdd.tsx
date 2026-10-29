@@ -104,8 +104,8 @@ export function QuickAddSheet(props: {
     } else {
       const categoryId = pending ? addCategory(pending.name, pending.color) : draft.categoryId;
       const id = addEntry({ ...draft, categoryId, title: draft.title.trim(), kind: kind as EntryKind });
-      const when = draft.date ? `${formatRelative(draft.date)}${draft.time ? ` · ${draft.time}` : ''}` : 'Sin fecha';
-      toast(`Guardado · ${when}`, { action: 'Deshacer', onAction: () => deleteEntry(id) });
+      const when = draft.date ? `Guardado · ${formatRelative(draft.date)}${draft.time ? ` · ${draft.time}` : ''}` : '📌 Guardado en Pendientes';
+      toast(when, { action: 'Deshacer', onAction: () => deleteEntry(id) });
     }
     props.onClose();
   };

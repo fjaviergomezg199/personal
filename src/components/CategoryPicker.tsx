@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { COLORS, COLOR_KEYS } from '../lib/colors';
 import { sortedCategories } from '../store/selectors';
 import { addCategory, useApp } from '../store/store';
@@ -81,10 +81,22 @@ export function CategoryPicker(props: {
   const state = useApp();
   const cats = sortedCategories(state);
   const [creating, setCreating] = useState(false);
+  // Van en una fila que se desliza: que la elegida se vea (también al escribir «#running»)
+  const row = useRef<HTMLDivElement>(null);
+  const chosen = props.pending ? `nueva:${props.pending.name}` : props.value;
+  useEffect(() => {
+    const box = row.current;
+    const el = box?.querySelector('[aria-checked="true"]');
+    if (!box || !el) return;
+    const r = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    if (r.left < b.left + 16) box.scrollLeft += r.left - b.left - 16;
+    else if (r.right > b.right - 16) box.scrollLeft += r.right - b.right + 16;
+  }, [chosen]);
   return (
     <div className="field">
       <span className="label">Categoría</span>
-      <div className="chips" role="radiogroup" aria-label="Categoría">
+      <div className="chips scroll" role="radiogroup" aria-label="Categoría" ref={row}>
         {props.pending && (
           <button type="button" role="radio" aria-checked className={`chip cat-chip sel new tone-${props.pending.color}`} onClick={props.onDropPending}>
             <i aria-hidden />

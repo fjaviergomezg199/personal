@@ -232,6 +232,11 @@ main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18
 .split-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); }
 .split-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .split-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.acc-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9.5em); align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.acc-in:first-of-type { border-top: 0; }
+.acc-in .nm { display: flex; flex-direction: column; min-width: 0; font-weight: 500; }
+.acc-in .nm small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.acc-in .inp { text-align: right; font-variant-numeric: tabular-nums; }
 .empty-row { padding: 12px 0; color: var(--muted); font-size: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .skipped { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding-top: 8px; border-top: 1px dashed var(--line); }
 
@@ -603,7 +608,7 @@ async function flush(path) {
 function saveConfig() { persist('app/config', S.config); }
 function saveMonth(k) {
   const d = S.months[k];
-  if (d && !(d.items || []).length && !Object.keys(d.rec || {}).length && !d.sweep) delete S.months[k];
+  if (d && !(d.items || []).length && !Object.keys(d.rec || {}).length && !d.sweep && !d.closed) delete S.months[k];
   persist('months/' + k, S.months[k] || null);
 }
 const LS_KEY = 'cuentas-claras-v1';
@@ -700,9 +705,17 @@ function alertsHtml(P) {
   else if (red) h += `<div class="notice neg">${ICON.alert}<div class="n-body"><div><b>Números rojos en ${mLong(red.k)}.</b> Con lo previsto, tus cuentas corrientes acabarían ese mes en ${eur(red.cc, { dec: 0 })}.</div>${fixLink(red.k)}</div></div>`;
   for (let i = 1; i <= 3; i++) {
     const k = addM(CUR, -i), t = totals(itemsFor(k).list);
+    if (i === 1 || monthDoc(k).closed) continue; // el mes anterior lo avisa «Cerrar el mes»
     if (t.pending) { h += `<div class="notice warn">${ICON.alert}<div class="n-body"><div>En <b>${mLong(k)}</b> hay ${t.pending === 1 ? '1 movimiento sin marcar' : t.pending + ' movimientos sin marcar'}. Márcalos como hechos o bórralos para que el mes cuadre.</div><div><button class="link" data-act="open-month" data-k="${k}">Abrir ${mName(k)} →</button></div></div></div>`; break; }
   }
   return h;
+}
+/* Lo que sobró (o faltó) en un mes, aunque ya haya pasado */
+function sweepAutoFor(k) { const t = totals(itemsFor(k).list.filter(x => !x.sweep)); return Math.round((t.sobra - t.ahorro) * 100) / 100; }
+function closeNotice() {
+  const k = addM(CUR, -1);
+  if (!hasAnyData() || monthDoc(k).closed || !itemsFor(k).list.length) return '';
+  return `<div class="notice info">${ICON.info}<div class="n-body"><div><b>Empieza ${mName(CUR)}: cierra ${mName(k)}.</b> Pon lo que tienes hoy en cada cuenta y lo que quedó pendiente se da por hecho. La previsión sigue desde ahí.</div><div><button class="btn primary" data-act="close-open" data-k="${k}">Cerrar ${mName(k)}</button></div></div></div>`;
 }
 function backupNotice() {
   if (!IS_APP || !hasAnyData()) return '';
@@ -779,7 +792,7 @@ function vResumen() {
   const c = C(), P = project(12), cur = itemsFor(CUR), t = totals(cur.list), end = P.rows[0];
   const next12 = project(13).rows.slice(1), save12 = sum(next12, r => r.t.sobra), avgSave = save12 / 12;
   const worst = next12.reduce((m, r) => r.t.sobra < m.t.sobra ? r : m, next12[0]);
-  let h = exampleBanner() + backupNotice() + onboarding() + alertsHtml(P);
+  let h = exampleBanner() + backupNotice() + closeNotice() + onboarding() + alertsHtml(P);
   const d = end.total - P.start.total;
   h += `<section class="hero">
     <div><div class="eyebrow">Tienes hoy</div><div class="hero-num">${eur(P.start.total, { dec: 0 })}</div>
@@ -834,9 +847,11 @@ function monthSplit(k, list) {
   const sw = list.find(x => x.sweep), pair = sweepPair();
   if (!sw || !pair || k < CUR || sw.status === 'hecho' || !(sw.amount > 0.005)) return '';
   const row = project(diffM(CUR, k) + 1).rows.slice(-1)[0], own = (monthDoc(k).sweep || {}).split != null;
+  const extra = list.filter(x => x.type === 'ahorro' && x.fixed && !x.sweep);
+  const extraNote = extra.length ? `Aparte va ${extra.map(x => `«${esc(x.name)}» (${eur(x.amount)})`).join(' y ')}, fuera de la barrita. <button class="link" data-act="split-absorb" data-k="${k}">Que lo reparta todo la barrita</button>` : '';
   return splitBlock({ key: k, pair, pct: splitFor(k), total: sw.amount, a1: row.split[pair[0].id] || 0, a2: row.split[pair[1].id] || 0,
     title: `Reparto de lo que sobra (${eur(sw.amount)})`, sub: own ? 'solo ' + mName(k) : 'el de todos los meses',
-    note: row.capHit ? `${esc(pair[0].name)} llega a ${eur(sweepCfg().cap, { dec: 0 })}: lo que pase va a ${esc(pair[1].name)}.` : '',
+    note: [row.capHit ? `${esc(pair[0].name)} llega a ${eur(sweepCfg().cap, { dec: 0 })}: lo que pase va a ${esc(pair[1].name)}.` : '', extraNote].filter(Boolean).join('<br>'),
     foot: own ? `<button class="link" data-act="split-all" data-k="${k}">Usar este reparto todos los meses</button><button class="link" data-act="split-reset" data-k="${k}">Volver al de siempre (${splitDefault()} %)</button>` : 'Si la mueves, cambia solo este mes.' });
 }
 function vMes() {
@@ -844,9 +859,9 @@ function vMes() {
   const split = k >= CUR ? project(diffM(CUR, k) + 1).rows.slice(-1)[0].split : null;
   let h = exampleBanner();
   h += `<div class="month-nav"><div class="mn"><button class="icon-btn" data-act="month" data-n="-1" aria-label="Mes anterior">${ICON.left}</button><h1>${cap(mLong(k))}</h1><button class="icon-btn" data-act="month" data-n="1" aria-label="Mes siguiente">${ICON.right}</button></div>
-    <div class="btns">${k !== CUR ? `<button class="btn" data-act="month" data-n="0">Ir a ${mName(CUR)}</button>` : '<span class="pill now">Este mes</span>'}${k > CUR ? '<span class="pill">Previsión</span>' : ''}</div></div>`;
+    <div class="btns">${k !== CUR ? `<button class="btn" data-act="month" data-n="0">Ir a ${mName(CUR)}</button>` : '<span class="pill now">Este mes</span>'}${k > CUR ? '<span class="pill">Previsión</span>' : ''}${monthDoc(k).closed ? `<span class="pill">Cerrado el ${fmtDate(monthDoc(k).closed.at)}</span><button class="link small" data-act="close-undo" data-k="${k}">Reabrir</button>` : k <= CUR && list.length ? `<button class="btn" data-act="close-open" data-k="${k}">Cerrar el mes</button>` : ''}</div></div>`;
   h += statsHtml(t, k);
-  if (k < CUR && t.pending) h += `<div class="notice warn">${ICON.alert}<div class="n-body"><div>Este mes ya pasó y tiene ${t.pending === 1 ? '1 movimiento sin marcar' : t.pending + ' movimientos sin marcar'}.</div><div><button class="btn" data-act="mark-all" data-k="${k}">Marcar todo como hecho</button></div></div></div>`;
+  if (k < CUR && !monthDoc(k).closed && list.length) h += `<div class="notice warn">${ICON.alert}<div class="n-body"><div>Este mes ya pasó${t.pending ? ` y tiene ${t.pending === 1 ? '1 movimiento sin marcar' : t.pending + ' movimientos sin marcar'}` : ''}. Ciérralo: pon los saldos de hoy y lo pendiente se da por hecho.</div><div><button class="btn primary" data-act="close-open" data-k="${k}">Cerrar ${mName(k)}</button></div></div></div>`;
   if (k === CUR) h += `<p class="small muted" style="margin:0">Toca el círculo cuando algo ya haya pasado por el banco. Lo pendiente es lo que cuenta para la previsión.</p>`;
   if (k > CUR) h += `<p class="small muted" style="margin:0">Mes futuro: todo es previsión. Marca algo como hecho solo si ya lo has pagado o cobrado por adelantado y está en tu saldo de hoy.</p>`;
   for (const type of ['ingreso', 'gasto', 'ahorro']) {
@@ -1210,6 +1225,21 @@ function sheetRestore(s) {
     <textarea class="inp" id="f-json" data-f="json" placeholder='{"app":"cuentas-claras", …}'>${esc(s.json || '')}</textarea>`,
     `<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button>${S.sheet.confirm === 'restore' ? `<button class="btn danger solid" data-act="restore-do">Sí, sustituir mis datos</button>` : `<button class="btn primary" data-act="sheet-confirm" data-v="restore">Restaurar</button>`}`);
 }
+function sheetClose(s) {
+  const k = s.k, c = C(), { list } = itemsFor(k), t = totals(list.filter(x => !x.sweep));
+  const pend = list.filter(it => it.status !== 'hecho' && !it.sweep), o = monthDoc(k).sweep || {};
+  const auto = sweepAutoFor(k), sweepPend = sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005;
+  const what = [pend.length ? (pend.length === 1 ? '1 movimiento' : pend.length + ' movimientos') : '', sweepPend ? (auto < 0 ? `lo que faltó (${eur(-auto)}), sacado del ahorro` : `lo que sobró (${eur(auto)}), pasado al ahorro`) : ''].filter(Boolean).join(' y ');
+  return sheetFrame('Cerrar ' + mLong(k),
+    `<div class="fixed-note">Pon lo que ves hoy en cada cuenta. ${cap(mName(k))} queda cerrado y la previsión sigue desde estos saldos.</div>
+    <dl class="kv"><dt>Ingresos</dt><dd>${eur(t.ingreso)}</dd><dt>Gastos</dt><dd>${eur(t.gasto)}</dd><dt>Te sobró</dt><dd class="${t.sobra < 0 ? 'negt' : ''}">${eur(t.sobra)}</dd></dl>
+    ${what ? `<label class="switch"><input type="checkbox" id="f-done" data-f="done" ${s.done ? 'checked' : ''}> Dar por hecho ${what}</label>
+      ${pend.length ? `<div class="small muted" style="margin-top:-8px">${pend.slice(0, 8).map(x => esc(x.name)).join(', ')}${pend.length > 8 ? '…' : ''}</div>` : ''}` : '<p class="small muted" style="margin:0">Todo lo del mes ya está marcado como hecho.</p>'}
+    <div class="field"><span class="lbl">Saldos de hoy</span>
+      ${c.accounts.length ? c.accounts.map(a => `<label class="acc-in"><span class="nm">${esc(a.name)}<small>${(ACC_KINDS.find(x => x[0] === a.kind) || [, ''])[1]} · antes ${eur(a.balance)}</small></span><input class="inp" inputmode="decimal" autocomplete="off" data-acc="${a.id}" value="${esc(s.accs[a.id] ?? '')}" aria-label="Saldo de hoy en ${esc(a.name)}"></label>`).join('') : '<span class="small muted">No tienes cuentas. Añádelas en Cuentas.</span>'}
+      <span class="hint">Si está en negativo, pon un menos delante.</span></div>`,
+    `<span class="grow"></span><button class="btn" data-act="sheet-close">Cancelar</button><button class="btn primary" data-act="close-save">Cerrar ${mName(k)}</button>`);
+}
 function sheetText(s) {
   return sheetFrame(esc(s.title), `<p class="small" style="margin:0">${esc(s.hint)}</p><textarea class="inp" id="f-text" readonly style="min-height:220px">${esc(s.text)}</textarea>`,
     `<span class="grow"></span><button class="btn" data-act="sheet-close">Cerrar</button><button class="btn primary" data-act="text-copy">Copiar</button>`);
@@ -1217,7 +1247,7 @@ function sheetText(s) {
 function renderSheet(focus) {
   const root = $('#sheet-root'), s = S.sheet;
   if (!s) { root.innerHTML = ''; document.body.classList.remove('locked'); return; }
-  const body = { item: sheetItem, fixed: sheetFixed, acc: sheetAcc, goal: sheetGoal, restore: sheetRestore, text: sheetText }[s.kind](s);
+  const body = { item: sheetItem, fixed: sheetFixed, acc: sheetAcc, goal: sheetGoal, restore: sheetRestore, text: sheetText, close: sheetClose }[s.kind](s);
   root.innerHTML = `<div class="scrim" data-act="sheet-close"></div><div class="sheet${focus ? ' enter' : ''}" role="dialog" aria-modal="true" aria-labelledby="sh-title">${body}</div>`;
   document.body.classList.add('locked');
   if (focus) { const f = root.querySelector('[data-autofocus]'); if (f && !f.value) f.focus({ preventScroll: true }); }
@@ -1348,6 +1378,24 @@ function saveFixed() {
     if (r.changes) { r.changes = r.changes.filter(x => x.from > r.from); r.changes.sort((a, b) => a.from < b.from ? -1 : 1); }
   }
   saveConfig(); closeSheet(); render();
+}
+function saveClose() {
+  const s = S.sheet, c = C(), k = s.k, bal = {};
+  for (const a of c.accounts) { const v = parseAmount(s.accs[a.id], true); if (isNaN(v)) return sheetError(`No entiendo el saldo de ${a.name}. Escríbelo como 1.234,56.`); bal[a.id] = v; }
+  const d = ensureMonth(k);
+  if (s.done) {
+    for (const it of itemsFor(k).list) {
+      if (it.status === 'hecho' || it.sweep) continue;
+      if (it.fixed) d.rec[it.recId] = Object.assign(d.rec[it.recId] || {}, { status: 'hecho' });
+      else { const x = d.items.find(i => i.id === it.id); if (x) x.status = 'hecho'; }
+    }
+    const o = d.sweep || {}, auto = sweepAutoFor(k);
+    if (sweepOn() && !o.skip && o.status !== 'hecho' && Math.abs(auto) > 0.005) d.sweep = Object.assign(o, { status: 'hecho', amount: o.amount != null ? o.amount : auto, frozen: o.amount == null });
+  }
+  for (const a of c.accounts) { a.balance = bal[a.id]; a.asOf = todayISO(); }
+  d.closed = { at: todayISO(), total: sum(Object.values(bal)), balances: bal };
+  saveMonth(k); saveConfig(); closeSheet(); render();
+  toast(`${cap(mName(k))} cerrado. Saldos al día.`);
 }
 function saveAcc() {
   const s = S.sheet, c = C(), bal = parseAmount(s.amount, true);
@@ -1498,6 +1546,14 @@ const A = {
     for (const k of Object.keys(S.months)) { const d = S.months[k]; if (k >= CUR && d.sweep && d.sweep.split != null) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; saveMonth(k); } }
     saveConfig(); render(); toast(`Desde ahora, ${v} % a ${sweepPair()[0].name} y ${100 - v} % a ${sweepPair()[1].name}.`);
   },
+  'split-absorb': el => {
+    const k = el.dataset.k, c = C(), ids = itemsFor(k).list.filter(x => x.type === 'ahorro' && x.fixed && !x.sweep).map(x => x.recId);
+    for (const id of ids) { const r = c.recurring.find(x => x.id === id); if (!r) continue; if (r.from >= k) c.recurring = c.recurring.filter(x => x !== r); else r.to = addM(k, -1); }
+    saveConfig(); render(); toast('Hecho: desde ' + mName(k) + ', todo «Al ahorro» lo reparte la barrita.');
+  },
+  'close-open': el => { const accs = {}; for (const a of C().accounts) accs[a.id] = amtStr(a.balance); openSheet({ kind: 'close', k: el.dataset.k, done: true, accs }); },
+  'close-save': () => saveClose(),
+  'close-undo': el => { const k = el.dataset.k, d = ensureMonth(k); delete d.closed; saveMonth(k); render(); toast(cap(mName(k)) + ' reabierto. Los saldos se quedan como están.'); },
   'split-reset': el => { const k = el.dataset.k, d = ensureMonth(k); if (d.sweep) { delete d.sweep.split; if (!Object.keys(d.sweep).length) delete d.sweep; } saveMonth(k); render(); },
   'sweep-settings': () => { closeSheet(); go('cuentas'); },
   'mark-all': el => { const k = el.dataset.k, d = ensureMonth(k); for (const it of itemsFor(k).list) { if (it.status === 'hecho' || it.sweep) continue; if (it.fixed) d.rec[it.recId] = Object.assign(d.rec[it.recId] || {}, { status: 'hecho' }); else d.items.find(x => x.id === it.id).status = 'hecho'; } saveMonth(k); render(); },
@@ -1564,6 +1620,7 @@ document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset && el.dataset.split) { splitLabels(el); return; }
   if (S.sheet && el.dataset && el.dataset.amt) { (S.sheet.amounts ||= {})[el.dataset.amt] = el.value; return; }
+  if (S.sheet && el.dataset && el.dataset.acc) { S.sheet.accs[el.dataset.acc] = el.value; return; }
   if (!S.sheet || !el.dataset || !el.dataset.f) return;
   S.sheet[el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value;
   if (el.dataset.f === 'freq') prefillAmounts(S.sheet);

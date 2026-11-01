@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCategory, addEntry, deleteCategory, getState, importEntries, moveCategory, normalizeState, replaceState, restoreCategory, toggleCategoryHidden, undoImport, updateCategory } from './store';
-import { agendaForRange, overdueEntries, pendingEntries } from './selectors';
+import { agendaForRange, overdueEntries, pendingEntries, planLeftovers } from './selectors';
 import type { AppState } from './types';
 
 vi.mock('./db', () => ({
@@ -133,5 +133,31 @@ describe('📌 pendientes', () => {
       } as unknown as Partial<AppState>),
     );
     expect(pendingEntries(getState(), '2026-10-28').map((e) => e.id)).toEqual(['star', 'new', 'late', 'old']);
+  });
+});
+
+describe('plan nuevo: lo que quedaba del anterior', () => {
+  it('solo lo importado de esa categoría, desde hoy y sin hacer (lo hecho y lo apuntado a mano se queda)', () => {
+    replaceState(
+      normalizeState({
+        settings: { name: 'Javi', onboarded: true },
+        categories: [
+          { id: 'run', name: 'Running', color: 'orange', order: 0, createdAt: now },
+          { id: 'sig', name: '2sigma', color: 'blue', order: 1, createdAt: now },
+        ],
+        entries: [
+          { ...base, id: 'next', title: 'Series 6×800', date: '2026-11-03', categoryId: 'run', importId: 'old', createdAt: now, updatedAt: now },
+          { ...base, id: 'today', title: 'Rodaje 50\'', date: '2026-11-01', categoryId: 'run', importId: 'old', createdAt: now, updatedAt: now },
+          { ...base, id: 'past', title: 'Tirada larga', date: '2026-10-25', categoryId: 'run', importId: 'old', createdAt: now, updatedAt: now },
+          { ...base, id: 'done', title: 'Series hechas', date: '2026-11-01', categoryId: 'run', importId: 'old', done: true, createdAt: now, updatedAt: now },
+          { ...base, id: 'class', title: 'Clase 8', date: '2026-11-03', categoryId: 'sig', importId: 'cls', createdAt: now, updatedAt: now },
+          { ...base, id: 'mine', title: 'Carrera popular', date: '2026-11-15', categoryId: 'run', createdAt: now, updatedAt: now },
+          { ...base, id: 'camp', title: 'Concentración', date: '2026-10-31', endDate: '2026-11-02', categoryId: 'run', importId: 'old', createdAt: now, updatedAt: now },
+        ],
+      } as unknown as Partial<AppState>),
+    );
+    expect(planLeftovers(getState(), new Set(['run']), '2026-11-01').map((e) => e.id).sort()).toEqual(['camp', 'next', 'today']);
+    expect(planLeftovers(getState(), new Set(['sig']), '2026-11-01').map((e) => e.id)).toEqual(['class']);
+    expect(planLeftovers(getState(), new Set(), '2026-11-01')).toEqual([]);
   });
 });

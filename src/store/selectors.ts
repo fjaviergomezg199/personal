@@ -108,6 +108,14 @@ export function undatedTasks(s: AppState): Entry[] {
 }
 
 /**
+ * Lo que queda de los planes importados antes en esas categorías (desde hoy y sin hacer): lo que un plan
+ * nuevo sustituye. Lo ya hecho, y lo apuntado a mano, se queda.
+ */
+export function planLeftovers(s: AppState, categoryIds: ReadonlySet<ID>, today: ISODate): Entry[] {
+  return s.entries.filter((e) => e.importId && e.categoryId && categoryIds.has(e.categoryId) && e.date && (e.endDate ?? e.date) >= today && !e.done);
+}
+
+/**
  * 📌 Pendientes: lo que se quedó sin hacer de otros días y lo apuntado sin fecha, a la vista hasta que se
  * haga. Arriba lo importante y, luego, lo último que ha quedado pendiente.
  */

@@ -2,12 +2,13 @@ import { Copy, FileUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CategoryBadge } from '../components/AgendaRow';
 import { CategoryPicker, nextColor } from '../components/CategoryPicker';
-import { Segmented, Sheet, toast } from '../components/ui';
+import { Segmented, Sheet, Switch, toast } from '../components/ui';
 import { importPrompt, parsePlan } from '../lib/calendarImport';
 import { addDays, capitalize, formatDayMonth, formatShort, todayISO, weekdayIndex } from '../lib/dates';
 import { copyText } from '../lib/files';
 import { fold } from '../lib/quickParse';
-import { addCategory, findCategory, getState, importEntries, undoImport, useApp, type EntryInput } from '../store/store';
+import { planLeftovers } from '../store/selectors';
+import { addCategory, deleteEntries, findCategory, getState, importEntries, restoreEntries, undoImport, useApp, type EntryInput } from '../store/store';
 import type { EntryKind, ID } from '../store/types';
 
 const PREVIEW = 40;
@@ -28,15 +29,27 @@ export function ImportSheet({ text: initialText, onClose }: { text?: string; onC
   const [start, setStart] = useState(() => nextMonday(today));
   const [categoryId, setCategoryId] = useState<ID | undefined>();
   const [kind, setKind] = useState<EntryKind>('task');
+  const [replace, setReplace] = useState(true);
 
   const parsed = useMemo(() => (text.trim() ? parsePlan(text, { start, today }) : { items: [], skipped: 0 }), [text, start, today]);
   const items = parsed.items;
   // Las categorías que trae el propio archivo (se crean si no existen)
   const fileCats = [...new Map(items.filter((i) => i.category).map((i) => [fold(i.category!), i.category!])).values()];
-  const relative = /\b(d[ií]a|semana|week|day)\s*\d|\b(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/i.test(text);
+  // «Día 1», «Semana 2 martes»…: solo si de verdad cuenta desde el inicio (al moverlo se mueven las fechas);
+  // un «martes» en las notas de un plan con fechas no lo es
+  const relative = useMemo(() => {
+    if (!items.length || !/\b(d[ií]a|semana|week|day)\s*\d|\b(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/i.test(text)) return false;
+    const moved = parsePlan(text, { start: addDays(start, 7), today }).items;
+    return moved.some((i, k) => i.date !== items[k]?.date);
+  }, [text, start, today, items]);
   const chosen = categoryId ? state.categories.find((c) => c.id === categoryId) : undefined;
 
   const catFor = (name?: string) => (name ? findCategory(state, name) : chosen);
+
+  // Un plan nuevo de la misma categoría sustituye lo que quedaba del anterior (lo hecho se queda)
+  const targetCats = new Set(items.map((i) => catFor(i.category)?.id).filter((id): id is ID => !!id));
+  const leftovers = items.length ? planLeftovers(state, targetCats, today) : [];
+  const oldPlans = [...new Set(leftovers.map((e) => state.imports.find((b) => b.id === e.importId)?.name ?? 'el plan anterior'))];
 
   const run = () => {
     if (!items.length) return;
@@ -58,13 +71,22 @@ export function ImportSheet({ text: initialText, onClose }: { text?: string; onC
       categoryId: i.category ? ids.get(fold(i.category)) : categoryId,
     }));
     const name = fileName || fileCats[0] || chosen?.name || `Importación del ${formatDayMonth(today)}`;
+    const removed = replace ? leftovers : [];
+    if (removed.length) deleteEntries(removed.map((e) => e.id));
     const { batchId } = importEntries(name, inputs);
     const first = items[0].date;
-    toast(`${inputs.length} ${inputs.length === 1 ? 'cosa' : 'cosas'} en el calendario, desde el ${formatDayMonth(first)}`, {
-      action: 'Deshacer',
-      onAction: () => undoImport(batchId),
-      duration: 8000,
-    });
+    toast(
+      `${inputs.length} ${inputs.length === 1 ? 'cosa' : 'cosas'} en el calendario, desde el ${formatDayMonth(first)}` +
+        (removed.length ? ` (y fuera ${removed.length} del plan anterior)` : ''),
+      {
+        action: 'Deshacer',
+        onAction: () => {
+          undoImport(batchId);
+          if (removed.length) restoreEntries(removed);
+        },
+        duration: 8000,
+      },
+    );
     onClose();
   };
 
@@ -159,6 +181,19 @@ export function ImportSheet({ text: initialText, onClose }: { text?: string; onC
                 ]}
               />
             </div>
+          )}
+          {leftovers.length > 0 && (
+            <Switch
+              checked={replace}
+              onChange={setReplace}
+              label="Sustituir el plan anterior"
+              description={
+                <>
+                  Quita lo que quedaba de {oldPlans.map((n) => `«${n}»`).join(', ')} desde hoy ({leftovers.length}{' '}
+                  {leftovers.length === 1 ? 'cosa' : 'cosas'}). Lo ya hecho se queda.
+                </>
+              }
+            />
           )}
           <div className="label mt12">
             {items.length} {items.length === 1 ? 'cosa' : 'cosas'}, del {formatDayMonth(items[0].date)} al {formatDayMonth(items.at(-1)!.date)}

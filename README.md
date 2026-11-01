@@ -39,7 +39,9 @@ Trabajo, 2Sigma, Running, Estudios, Casa… las que quieras, cada una con su **c
 
 ### Importar al calendario (un plan en JSON)
 
-*Ajustes → Importar al calendario* (o el atajo «Importar» del icono). Se pega el JSON (o se elige el fichero), se ve cómo queda y se importa todo de una vez. Cada importación se puede **deshacer** entera, desde el aviso o desde Ajustes. Lo de un plan no se arrastra: si una sesión no se hace, se queda en su día (no pasa a «de otros días»).
+*Ajustes → Importar al calendario* (o el atajo «Importar» del icono). Se pega el JSON (o se elige el fichero), se ve cómo queda y se importa todo de una vez. Cada importación se puede **deshacer** entera, desde el aviso o desde Ajustes. Lo de un plan no se arrastra: si una sesión no se hace, se queda en su día (no pasa a 📌 Pendientes).
+
+**Plan nuevo que sustituye a otro:** si ya había un plan importado en esa categoría (un plan de running anterior, por ejemplo), al importar el nuevo se ofrece **«Sustituir el plan anterior»**: quita lo que le quedaba desde hoy y sin hacer. Lo ya hecho, lo pasado y lo apuntado a mano se quedan, y «Deshacer» lo devuelve todo como estaba.
 
 Si no tienes el JSON, pídeselo a ChatGPT o a Claude: el botón *Copiar instrucciones* copia lo que hay que pedirles, con la fecha de inicio. El formato:
 
